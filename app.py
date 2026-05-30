@@ -16,6 +16,45 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
 IMAGES_FOLDER = os.path.join(BASE_DIR, 'static', 'images')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(IMAGES_FOLDER, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_date TEXT, customer TEXT, address TEXT, state TEXT, pin TEXT,
+            sku TEXT, qty TEXT DEFAULT '1', invoice_no TEXT, awb TEXT UNIQUE,
+            order_id TEXT, courier TEXT, amount REAL, payment TEXT DEFAULT 'COD',
+            batch TEXT, entity TEXT DEFAULT 'SAI Enterprises', platform TEXT,
+            status TEXT DEFAULT 'Pending', cost REAL, settlement REAL, pnl REAL,
+            fin_note TEXT, return_awb TEXT, rto TEXT, dto TEXT, wrong_return TEXT,
+            claim_date TEXT, claim_recd_date TEXT, claim_amt REAL,
+            return_remark TEXT, fraud TEXT, photo TEXT, product_image TEXT,
+            scanned_by TEXT, created_at TEXT DEFAULT current_timestamp,
+            updated_at TEXT DEFAULT current_timestamp
+        );
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku TEXT, store_name TEXT, platform TEXT, category TEXT,
+            cost REAL, selling_price REAL, image_url TEXT, status TEXT,
+            rto_per REAL, ret_per REAL, inventory INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS staff_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT, action TEXT, details TEXT,
+            created_at TEXT DEFAULT current_timestamp
+        );
+        CREATE TABLE IF NOT EXISTS returns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            awb TEXT, condition TEXT, remark TEXT, photos TEXT,
+            scanned_by TEXT, created_at TEXT DEFAULT current_timestamp
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 USERS = {
     'admin':  {'password': 'sai@admin2026', 'role': 'admin',  'name': 'Admin (Lalit)'},
