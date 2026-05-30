@@ -496,7 +496,7 @@ async function loadOrders(page=1) {
   const tbody = document.getElementById('orders-tbody');
   tbody.innerHTML = '<tr><td colspan="12" class="loading"><div class="spinner"></div></td></tr>';
   
-  const params = new URLSearchParams({page, per_page:100, search, status, platform, courier});
+  const params = new URLSearchParams({page:page, per_page:50, search:search, status:status, platform:platform, courier:courier});
   const r = await fetch('/api/orders?' + params);
   const data = await r.json();
   totalOrders = data.total;
