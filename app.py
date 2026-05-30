@@ -65,10 +65,13 @@ def parse_pdf(pdf_path):
         'product_image': '', 'cost': ''
     }
     try:
+        text = ''
         with pdfplumber.open(pdf_path) as pdf:
-            text = ''
-            for page in pdf.pages:
-                text += (page.extract_text() or '') + '\n'
+            for page in pdf.pages[:3]:  # max 3 pages only
+                try:
+                    text += (page.extract_text() or '') + '\n'
+                except:
+                    pass
         lines = text.split('\n')
 
         # AWB
@@ -329,13 +332,23 @@ def scan_zip():
 
         results = []
         for pdf_path in pdf_files:
-            parsed = parse_pdf(pdf_path)
-            parsed['batch'] = batch_date
-            parsed['status'] = 'Pending'
-            parsed['scanned_by'] = session.get('name', '')
-            parsed['is_duplicate'] = parsed.get('awb','') in existing_awbs
-            parsed['filename'] = os.path.basename(pdf_path)
-            results.append(parsed)
+            try:
+                parsed = parse_pdf(pdf_path)
+                parsed['batch'] = batch_date
+                parsed['status'] = 'Pending'
+                parsed['scanned_by'] = session.get('name', '')
+                parsed['is_duplicate'] = parsed.get('awb','') in existing_awbs
+                parsed['filename'] = os.path.basename(pdf_path)
+                results.append(parsed)
+            except Exception as e:
+                results.append({
+                    'awb': '', 'order_id': '', 'customer': '',
+                    'sku': '', 'amount': '', 'courier': '', 'platform': '',
+                    'batch': batch_date, 'status': 'Pending',
+                    'is_duplicate': False, 'product_image': '',
+                    'filename': os.path.basename(pdf_path),
+                    'parse_error': str(e)
+                })
 
         shutil.rmtree(tmp_dir, ignore_errors=True)
         log_action(session.get('user','?'), 'SCAN_ZIP', f"Batch:{batch_date} PDFs:{len(results)}")
