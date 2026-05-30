@@ -507,27 +507,28 @@ async function loadOrders(page=1) {
   }
   
   tbody.innerHTML = data.orders.map(o => {
-    const st = o['Status']||'Pending';
+    const st = o.status||'Pending';
     const stClass = st==='Delivered'?'delivered':st.includes('RTO')?'rto':st==='Pending'?'pending':st==='Shipped'||st==='In Transit'?'shipped':'lost';
     const statusOpts = ['Pending','Picked Up','In Transit','Delivered','RTO Initiated','RTO Received','Lost','Damaged','Fake Delivery','Cancelled'];
-    return `<tr onclick="showOrderDetail(${JSON.stringify(o).replace(/"/g,'&quot;')})">
-      <td>${o['#']||''}</td>
-      <td style="white-space:nowrap">${o['Order Date']||''}</td>
-      <td><span style="font-size:12px;font-family:monospace;color:var(--accent2)">${o['AWB']||''}</span></td>
-      <td style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${o['Order ID']||''}</td>
-      <td>${o['Customer']||'—'}</td>
-      <td style="font-size:12px">${o['SKU']||''}</td>
-      <td>₹${o['Amount (₹)']||''}</td>
-      <td>${o['Platform']||''}</td>
-      <td>${o['Courier']||''}</td>
-      <td style="font-size:11px">${o['Batch']||''}</td>
+    const detail = JSON.stringify(o).replace(/"/g,'&quot;');
+    return `<tr onclick="showOrderDetail(${detail})">
+      <td>${o.id||''}</td>
+      <td style="white-space:nowrap;font-size:11px">${o.order_date||''}</td>
+      <td><span style="font-size:11px;font-family:monospace;color:var(--accent2)">${o.awb||''}</span></td>
+      <td style="font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.order_id||''}</td>
+      <td style="font-size:12px">${o.customer||'—'}</td>
+      <td style="font-size:11px">${o.sku||''}</td>
+      <td>₹${o.amount||''}</td>
+      <td><span style="font-size:11px">${o.platform||''}</span></td>
+      <td><span style="font-size:11px">${o.courier||''}</span></td>
+      <td style="font-size:11px">${o.batch||''}</td>
       <td onclick="event.stopPropagation()">
-        <select class="badge badge-${stClass}" style="background:transparent;border:none;cursor:pointer" onchange="updateStatus('${o['AWB']}',this.value)">
+        <select class="badge badge-${stClass}" style="background:transparent;border:none;cursor:pointer;font-size:11px" onchange="updateStatus('${o.awb}',this.value)">
           ${statusOpts.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}
         </select>
       </td>
       <td onclick="event.stopPropagation()">
-        <button class="btn btn-secondary btn-sm" onclick="showOrderDetail(${JSON.stringify(o).replace(/"/g,'&quot;')})">👁</button>
+        <button class="btn btn-secondary btn-sm" onclick="showOrderDetail(${detail})">👁</button>
       </td>
     </tr>`;
   }).join('');
