@@ -539,9 +539,9 @@ function showTab(tab) {
   if(tab==='claims') loadClaims();
   if(tab==='products') loadProducts();
   if(tab==='finance') loadFinance();
-  if(tab==='fraud') loadFraud(
+  if(tab==='fraud') loadFraud();
    if(tab==='skuscanner') document.getElementById('sku-input').focus(); 
-  );
+  
   document.getElementById('sidebar').classList.remove('open');
 }
 
@@ -550,7 +550,7 @@ function toast(msg, type='success') {
   t.textContent = msg;
   t.className = 'toast show ' + type;
   setTimeout(() => t.className = 'toast', 3000);
-},skuscanner:'🔍 SKU Scanner'
+
 
 // ============ DASHBOARD ============
 async function loadDashboard() {
