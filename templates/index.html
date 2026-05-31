@@ -413,7 +413,35 @@ textarea{background:rgba(255,255,255,0.05);border:1px solid var(--border);border
         </div>
       </div>
     </div>
+    <!-- SKU SCANNER TAB -->
+<div class="tab-pane" id="tab-skuscanner">
+  <div class="scanner-grid">
+    <div class="scanner-card">
+      <h3>🔍 SKU Product Scanner</h3>
+      <div style="margin-bottom:16px;padding:14px;background:rgba(79,163,224,0.1);border:1px solid rgba(79,163,224,0.3);border-radius:10px;font-size:13px;color:var(--accent2);">
+        📱 Camera se product ka barcode scan karo ya SKU manually type karo
+      </div>
+      <div style="margin-bottom:16px;">
+        <div id="sku-camera-container" style="display:none;width:100%;max-width:320px;margin:0 auto 12px;">
+          <video id="sku-video" style="width:100%;border-radius:10px;border:2px solid var(--accent2);"></video>
+          <button class="btn btn-secondary" onclick="stopSKUScan()" style="width:100%;margin-top:8px;">⏹ Stop Camera</button>
+        </div>
+        <button class="btn btn-secondary" id="start-sku-btn" onclick="startSKUScan()" style="width:100%;margin-bottom:12px;">📷 Camera se Scan Karo</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="sku-input" placeholder="SKU type karo ya scan karo..." style="flex:1;" onkeydown="if(event.key==='Enter')lookupSKU()">
+        <button class="btn btn-primary" onclick="lookupSKU()">🔍 Search</button>
+      </div>
+    </div>
 
+    <div class="scanner-card" id="sku-result-card" style="display:none;">
+      <h3>📦 Product Details</h3>
+      <div id="sku-result"></div>
+    </div>
+  </div>
+
+  <div id="sku-history" style="margin-top:20px;"></div>
+</div>
     <!-- PRODUCTS TAB -->
     <div class="tab-pane" id="tab-products">
       <div class="table-card">
