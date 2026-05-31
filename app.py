@@ -565,7 +565,22 @@ def export_csv():
     output.seek(0)
     return Response(output.getvalue(), mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename=orders_{datetime.now().strftime("%d%b%Y")}.csv'})
-
+# ============ PRODUCT LOOKUP (SKU Scanner) ============
+@app.route('/api/product/lookup')
+@login_required
+def product_lookup():
+    sku = request.args.get('sku','').strip()
+    if not sku:
+        return jsonify({'error':'SKU required'}), 400
+    conn = get_db()
+    prod = conn.execute(
+        "SELECT sku,store_name,platform,cost,selling_price,image_url,status,rto_per,ret_per FROM products WHERE sku=? LIMIT 1",
+        (sku,)
+    ).fetchone()
+    conn.close()
+    if prod:
+        return jsonify({'found':True,'product':dict(prod)})
+    return jsonify({'found':False,'message':'SKU not found'})
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
