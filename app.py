@@ -577,10 +577,16 @@ def product_lookup():
         "SELECT sku,store_name,platform,cost,selling_price,image_url,status,rto_per,ret_per FROM products WHERE sku=? LIMIT 1",
         (sku,)
     ).fetchone()
+    if not prod:
+        prod = conn.execute(
+            "SELECT sku,store_name,platform,cost,selling_price,image_url,status,rto_per,ret_per FROM products WHERE sku LIKE ? LIMIT 1",
+            (f'%{sku[:10]}%',)
+        ).fetchone()
     conn.close()
     if prod:
         return jsonify({'found':True,'product':dict(prod)})
     return jsonify({'found':False,'message':'SKU not found'})
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(debug=False, host='0.0.0.0', port=port)
