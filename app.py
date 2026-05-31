@@ -66,7 +66,7 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    return connFix Delhivery AWB pattern 149
 
 def login_required(f):
     @wraps(f)
