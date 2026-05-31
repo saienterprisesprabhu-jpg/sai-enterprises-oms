@@ -1017,7 +1017,119 @@ function stopQRScan() {
   document.getElementById('qr-preview-container').style.display = 'none';
   document.getElementById('start-qr-btn').style.display = 'block';
 }
+// ============ SKU SCANNER ============
+let skuStream = null;
+let skuHistory = [];
 
+async function lookupSKU() {
+  const sku = document.getElementById('sku-input').value.trim();
+  if(!sku) { toast('SKU enter karo!', 'error'); return; }
+  
+  const r = await fetch('/api/product/lookup?sku=' + encodeURIComponent(sku));
+  const data = await r.json();
+  
+  const card = document.getElementById('sku-result-card');
+  const result = document.getElementById('sku-result');
+  card.style.display = 'block';
+  
+  if(data.found) {
+    const p = data.product;
+    const profit = ((p.selling_price||0) - (p.cost||0)).toFixed(0);
+    const margin = p.selling_price ? (((p.selling_price-p.cost)/p.selling_price)*100).toFixed(1) : 0;
+    result.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        ${p.image_url ? `<img src="${p.image_url}" style="width:120px;height:120px;object-fit:cover;border-radius:12px;border:2px solid var(--accent2);">` : '<div style="font-size:60px;">📦</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">SKU</div>
+          <div style="font-size:13px;font-weight:700;color:var(--accent2);">${p.sku||'—'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Platform</div>
+          <div style="font-size:13px;font-weight:700;">${p.platform||'—'}</div>
+        </div>
+        <div style="background:rgba(248,81,73,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Cost Price</div>
+          <div style="font-size:20px;font-weight:800;color:var(--danger);">₹${p.cost||'—'}</div>
+        </div>
+        <div style="background:rgba(63,185,80,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Selling Price</div>
+          <div style="font-size:20px;font-weight:800;color:var(--success);">₹${p.selling_price||'—'}</div>
+        </div>
+        <div style="background:rgba(79,163,224,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Profit</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent2);">₹${profit}</div>
+        </div>
+        <div style="background:rgba(163,113,247,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Margin</div>
+          <div style="font-size:20px;font-weight:800;color:#a371f7;">${margin}%</div>
+        </div>
+      </div>`;
+    skuHistory.unshift({sku: p.sku, price: p.selling_price, cost: p.cost, image: p.image_url, time: new Date().toLocaleTimeString('en-IN')});
+    renderSKUHistory();
+    toast('✅ Product found: ' + p.sku);
+  } else {
+    result.innerHTML = `<div style="text-align:center;padding:30px;color:var(--danger);">❌ SKU not found: <strong>${sku}</strong></div>`;
+    toast('SKU not found!', 'error');
+  }
+  document.getElementById('sku-input').value = '';
+}
+
+function renderSKUHistory() {
+  if(!skuHistory.length) return;
+  document.getElementById('sku-history').innerHTML = `
+    <div class="table-card">
+      <div class="table-header"><h3>📋 Scan History</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:8px;">
+        ${skuHistory.slice(0,10).map(h=>`
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;">
+            ${h.image?`<img src="${h.image}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`:'<div style="font-size:24px;">📦</div>'}
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:var(--accent2);">${h.sku}</div>
+              <div style="font-size:12px;color:var(--muted);">Cost: ₹${h.cost} | Price: ₹${h.price}</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);">${h.time}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+async function startSKUScan() {
+  try {
+    document.getElementById('sku-camera-container').style.display = 'block';
+    document.getElementById('start-sku-btn').style.display = 'none';
+    const video = document.getElementById('sku-video');
+    skuStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = skuStream;
+    video.play();
+    if('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector();
+      const interval = setInterval(async()=>{
+        try {
+          const codes = await detector.detect(video);
+          if(codes.length>0) {
+            document.getElementById('sku-input').value = codes[0].rawValue;
+            clearInterval(interval);
+            stopSKUScan();
+            lookupSKU();
+          }
+        } catch(e){}
+      }, 500);
+    } else {
+      toast('⚠️ Camera on — SKU manually type karo', 'error');
+    }
+  } catch(e) {
+    toast('❌ Camera access nahi mila', 'error');
+    stopSKUScan();
+  }
+}
+
+function stopSKUScan() {
+  if(skuStream) { skuStream.getTracks().forEach(t=>t.stop()); skuStream=null; }
+  document.getElementById('sku-camera-container').style.display = 'none';
+  document.getElementById('start-sku-btn').style.display = 'block';
+}
 // Init
 loadDashboard();
 </script>
