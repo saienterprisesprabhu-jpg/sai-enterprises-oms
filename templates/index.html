@@ -527,7 +527,7 @@ function toggleSidebar() {
 function showTab(tab) {
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');document.getElementById('tab-' + tab).classList.add('active');
   event.currentTarget.classList.add('active');
   const titles = {dashboard:'📊 Dashboard',scanner:'📦 Scanner',dispatch:'🚚 Dispatch Scanner',orders:'📋 All Orders',
     returns:'🔄 Returns & RTO',claims:'📝 Claims',products:'🏷️ Products/SKU',
@@ -902,16 +902,43 @@ async function dispatchScan() {
   const data = await r.json();
   
   if(data.success) {
-    // Add to log
-    dispatchLog.unshift({awb, time: new Date().toLocaleTimeString('en-IN')});
+    // Product details fetch karo
+    const orderR = await fetch('/api/orders?search=' + encodeURIComponent(awb) + '&per_page=1');
+    const orderData = await orderR.json();
+    const order = orderData.orders && orderData.orders[0];
+    
+    let productHTML = '';
+    if(order && order.sku) {
+      const prodR = await fetch('/api/product/lookup?sku=' + encodeURIComponent(order.sku));
+      const prodData = await prodR.json();
+      if(prodData.found) {
+        const p = prodData.product;
+        productHTML = `
+          <div style="display:flex;gap:12px;align-items:center;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;margin-bottom:8px;">
+            ${p.image_url ? `<img src="${p.image_url}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:2px solid var(--success);">` : '<div style="font-size:40px;">📦</div>'}
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--success);">✅ Shipped: ${awb}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">SKU: <strong>${p.sku}</strong></div>
+              <div style="font-size:12px;color:var(--muted);">Cost: ₹${p.cost} | Price: ₹${p.selling_price}</div>
+              <div style="font-size:12px;color:var(--muted);">Customer: ${order.customer||'—'}</div>
+            </div>
+          </div>`;
+      }
+    }
+    
+    if(!productHTML) {
+      productHTML = `<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <span style="font-family:monospace;font-size:13px;color:var(--success);">✅ ${awb}</span>
+      </div>`;
+    }
+    
+    dispatchLog.unshift({awb, html: productHTML, time: new Date().toLocaleTimeString('en-IN')});
     renderDispatchLog();
     toast('✅ Shipped: ' + awb);
     
-    // Remove from pending table
     const row = document.getElementById('row-' + awb.replace(/[^a-zA-Z0-9]/g,''));
     if(row) row.remove();
     
-    // Update count
     const countEl = document.getElementById('pending-count');
     const current = parseInt(countEl.textContent) || 0;
     countEl.textContent = (current - 1) + ' pending';
