@@ -196,6 +196,8 @@ def parse_page_text(text):
         try:
             conn = get_db()
             prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
+           if not prod:
+                prod = conn.execute("SELECT image_url, cost FROM products WHERE sku LIKE ? LIMIT 1", (data['sku'][:12]+'%',)).fetchone() 
             if prod:
                 data['product_image'] = prod['image_url'] or ''
                 data['cost'] = str(prod['cost'] or '')
