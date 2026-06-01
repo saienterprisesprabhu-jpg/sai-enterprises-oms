@@ -67,14 +67,11 @@ def get_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     return conn
-def login_required(f):return conn
+
+def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'user' not in sessidef get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return connon:
+        if 'user' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated
