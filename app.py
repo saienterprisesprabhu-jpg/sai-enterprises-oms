@@ -150,12 +150,9 @@ def parse_page_text(text):
         else:
             for m in re.finditer(r'\b(\d{14,18})\b', full_text):
                 awb = m.group(1); break
-    else:
-        m = re.search(r'\b(SF\d{10,})\b', full_text)
-        if m: awb = m.group(1)
-        else:
-            for m in re.finditer(r'\b(\d{14,16})\b', full_text):
-                awb = m.group(1); break
+   else:
+        for m in re.finditer(r'\b(\d{14,16})\b', full_text):
+            awb = m.group(1); break
     if not awb: return None
     data['awb'] = awb
 
