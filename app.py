@@ -194,7 +194,8 @@ def parse_page_text(text):
     # SKU image lookup
     if data['sku']:
         try:
-          prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
+            conn = get_db()
+            prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
             if not prod:
                 prod = conn.execute("SELECT image_url, cost FROM products WHERE sku LIKE ? LIMIT 1", (data['sku'][:12]+'%',)).fetchone()
             if prod:
@@ -210,23 +211,19 @@ def parse_pdf(pdf_path):
     try:
         with pdfplumber.open(pdf_path) as pdf:
             total_pages = len(pdf.pages)
-            # Each page = one order (for Shadowfax/Delhivery multi-order PDFs)
-            # For invoice PDFs, every 2 pages = one order
             i = 0
             while i < total_pages:
                 try:
                     text = pdf.pages[i].extract_text() or ''
-                    # Try combining with next page if no AWB found
                     parsed = parse_page_text(text)
                     if parsed:
                         results.append(parsed)
                     elif i+1 < total_pages:
-                        # Try combining 2 pages
                         text2 = text + '\n' + (pdf.pages[i+1].extract_text() or '')
                         parsed2 = parse_page_text(text2)
                         if parsed2:
                             results.append(parsed2)
-                            i += 1  # skip next page
+                            i += 1
                 except Exception as e:
                     pass
                 i += 1
@@ -317,7 +314,7 @@ def update_status():
     conn.execute("UPDATE orders SET status=?,updated_at=datetime('now','localtime') WHERE awb=?", (status,awb))
     conn.commit()
     conn.close()
-    log_action(session.get('user','?'), 'STATUS_UPDATE', f"AWB:{awb}→{status}")
+    log_action(session.get('user','?'), 'STATUS_UPDATE', f"AWB:{awb}>{status}")
     return jsonify({'success':True})
 
 @app.route('/api/orders/bulk_status', methods=['POST'])
@@ -566,6 +563,7 @@ def export_csv():
     output.seek(0)
     return Response(output.getvalue(), mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename=orders_{datetime.now().strftime("%d%b%Y")}.csv'})
+
 # ============ PRODUCT LOOKUP (SKU Scanner) ============
 @app.route('/api/product/lookup')
 @login_required
