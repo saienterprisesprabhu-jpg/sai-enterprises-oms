@@ -906,7 +906,7 @@ async function dispatchScan() {
     const orderR = await fetch('/api/orders?search=' + encodeURIComponent(awb) + '&per_page=1');
     const orderData = await orderR.json();
     const order = orderData.orders && orderData.orders[0];
-    
+    console.log('Order data:', order);
     let productHTML = '';
     if(order && order.sku) {
       const prodR = await fetch('/api/product/lookup?sku=' + encodeURIComponent(order.sku));
