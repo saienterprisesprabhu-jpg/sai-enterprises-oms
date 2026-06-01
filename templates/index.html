@@ -932,7 +932,7 @@ async function dispatchScan() {
       </div>`;
     }
     
-    dispatchLog.unshift({awb, html: productHTML, time: new Date().toLocaleTimeString('en-IN')});
+   dispatchLog.unshift({awb, time: new Date().toLocaleTimeString('en-IN'), image: order ? order.product_image : '', sku: order ? order.sku : '', customer: order ? order.customer : '', cost: order ? order.cost : '', amount: order ? order.amount : ''});
     renderDispatchLog();
     toast('✅ Shipped: ' + awb);
     
