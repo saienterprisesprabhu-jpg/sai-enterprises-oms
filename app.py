@@ -94,6 +94,7 @@ def log_action(username, action, details=''):
         conn.close()
     except: pass
 
+# ============ FIXED PARSE FUNCTION ============
 def parse_page_text(text):
     data = {
         'awb':'','order_id':'','customer':'','address':'',
@@ -105,99 +106,215 @@ def parse_page_text(text):
     if not text or len(text.strip()) < 20:
         return None
 
-    lines = text.split('\n')
+    lines = [l.strip() for l in text.split('\n')]
+    full_text = text
 
-    # AWB
-    for pat in [r'(SF\d{10,}[A-Z0-9]*)', r'(VL\d{13,})', r'\b(149\d{13})\b', r'([A-Z]{2,4}\d{9,15})']:
-        m = re.search(pat, text)
-        if m:
-            data['awb'] = m.group(1)
+    # ============ COURIER DETECT FIRST (needed for AWB pattern) ============
+    courier = ''
+    if re.search(r'shadowfax', full_text, re.I):
+        courier = 'Shadowfax'
+    elif re.search(r'delhivery', full_text, re.I):
+        courier = 'Delhivery'
+    elif re.search(r'ekart|flipkart', full_text, re.I):
+        courier = 'Ekart'
+    elif re.search(r'valmoplus', full_text, re.I):
+        courier = 'ValmoPlus'
+    elif re.search(r'valmo', full_text, re.I):
+        courier = 'Valmo'
+    elif re.search(r'xpressbees', full_text, re.I):
+        courier = 'XpressBees'
+    elif re.search(r'bluedart', full_text, re.I):
+        courier = 'BlueDart'
+    data['courier'] = courier
+
+    # ============ AWB — courier-specific patterns ============
+    awb = ''
+
+    if courier == 'Shadowfax':
+        # SF followed by digits
+        m = re.search(r'(SF\d{10,})', full_text)
+        if m: awb = m.group(1)
+
+    elif courier == 'Delhivery':
+        # Delhivery AWB = 14-16 digit number (NOT 18+ digit Meesho Order ID)
+        for m in re.finditer(r'\b(\d{14,16})\b', full_text):
+            awb = m.group(1)
             break
 
-    if not data['awb']:
-        return None
-
-    # Order ID
-    for pat in [r'(\d{18,20}_\d+)', r'Purchase Order No[.\s]*\n?(\d+)']:
-        m = re.search(pat, text, re.IGNORECASE)
+    elif courier in ('Valmo', 'ValmoPlus'):
+        # VL prefix or long numeric
+        m = re.search(r'(VL\d{9,})', full_text, re.I)
         if m:
-            data['order_id'] = m.group(1)
-            break
+            awb = m.group(1)
+        else:
+            for m in re.finditer(r'\b(\d{14,18})\b', full_text):
+                awb = m.group(1)
+                break
 
-    # Invoice & date
-    inv_row = re.search(r'Purchase Order No\..*?Invoice No\..*?\n([^\n]+)', text, re.DOTALL)
-    if inv_row:
-        parts = inv_row.group(1).strip().split()
-        if len(parts) >= 2:
-            data['invoice_no'] = parts[1]
-            if len(parts) > 2:
-                data['order_date'] = parts[2]
+    elif courier == 'Ekart':
+        # FMPP or similar
+        m = re.search(r'(FMPP\w+)', full_text, re.I)
+        if m:
+            awb = m.group(1)
+        else:
+            for m in re.finditer(r'\b(\d{14,18})\b', full_text):
+                awb = m.group(1)
+                break
 
-    # Amount
-    cod_m = re.search(r'Total\s+Rs\.(\d+\.?\d*)', text)
-    if cod_m:
-        data['amount'] = cod_m.group(1)
     else:
-        cod_m = re.search(r'Rs[.\s]*(\d+\.?\d*)', text)
-        if cod_m:
-            data['amount'] = cod_m.group(1)
+        # Generic fallback — prefer SF prefix, then 14-16 digit
+        m = re.search(r'(SF\d{10,})', full_text)
+        if m:
+            awb = m.group(1)
+        else:
+            for m in re.finditer(r'\b(\d{14,16})\b', full_text):
+                awb = m.group(1)
+                break
 
-    # Payment
-    data['payment'] = 'Prepaid' if 'prepaid' in text.lower() else 'COD'
+    if not awb:
+        return None
+    data['awb'] = awb
 
-    # Courier
-    for c in ['Shadowfax','Delhivery','Ekart','Valmo','XpressBees','BlueDart']:
-        if c.lower() in text.lower():
-            data['courier'] = c
-            break
+    # ============ ORDER ID — Meesho style: 18+ digits optionally _1 ============
+    m = re.search(r'\b(\d{18,20}(?:_\d+)?)\b', full_text)
+    if m and m.group(1) != awb:
+        data['order_id'] = m.group(1)
+    else:
+        # Try "Purchase Order No" pattern
+        m2 = re.search(r'Purchase Order No[.\s]*\n?(\d+)', full_text, re.IGNORECASE)
+        if m2:
+            data['order_id'] = m2.group(1)
 
-    # Platform
-    if 'meesho' in text.lower() or 'sold by' in text.lower():
+    # ============ PLATFORM ============
+    if re.search(r'meesho|sold by', full_text, re.I):
         data['platform'] = 'Meesho'
-    elif 'flipkart' in text.lower():
+    elif re.search(r'flipkart', full_text, re.I):
         data['platform'] = 'Flipkart'
-    elif 'amazon' in text.lower():
+    elif re.search(r'amazon', full_text, re.I):
         data['platform'] = 'Amazon'
 
-    # SKU
-    sku_m = re.search(r'SKU\s+Size\s+Qty.*?\n([^\s]+)', text, re.DOTALL)
-    if sku_m:
-        data['sku'] = sku_m.group(1).strip()
+    # ============ INVOICE & DATE ============
+    inv_m = re.search(r'Invoice No[.\s:]*([A-Z0-9\-/]+)', full_text, re.I)
+    if inv_m:
+        data['invoice_no'] = inv_m.group(1).strip()
 
-    # Customer
-    for i, line in enumerate(lines):
-        if 'customer address' in line.lower():
-            for j in range(i+1, min(i+5, len(lines))):
-                candidate = lines[j].strip()
-                if candidate and not any(x in candidate.lower() for x in ['shadowfax','delhivery','ekart','cod','pickup','valmo','prepaid']):
-                    data['customer'] = candidate
-                    addr_parts = []
-                    for k in range(j+1, min(j+4, len(lines))):
-                        l = lines[k].strip()
-                        if l and 'undelivered' not in l.lower():
-                            addr_parts.append(l)
-                    data['address'] = ', '.join(addr_parts[:2])
+    date_m = re.search(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}-\d{2}-\d{2})', full_text)
+    if date_m:
+        data['order_date'] = date_m.group(1)
+
+    # ============ AMOUNT — improved ============
+    amount = ''
+    # Pattern 1: Grand Total / Total Amount
+    for pat in [
+        r'Grand\s+Total[\s:₹Rs.]*(\d+\.?\d*)',
+        r'Total\s+Amount[\s:₹Rs.]*(\d+\.?\d*)',
+        r'Amount\s+Payable[\s:₹Rs.]*(\d+\.?\d*)',
+        r'COD\s+Amount[\s:₹Rs.]*(\d+\.?\d*)',
+        r'Total\s+Rs\.?\s*(\d+\.?\d*)',
+        r'Rs\.?\s*(\d{2,5}\.?\d{0,2})\b',
+    ]:
+        m = re.search(pat, full_text, re.I)
+        if m:
+            val = float(m.group(1))
+            # Sanity check: amount should be between 50 and 9999
+            if 50 <= val <= 9999:
+                amount = str(val)
+                break
+    data['amount'] = amount
+
+    # ============ PAYMENT ============
+    data['payment'] = 'Prepaid' if re.search(r'prepaid', full_text, re.I) else 'COD'
+
+    # ============ SKU — FIXED: capture full SKU including + and / lines ============
+    sku = ''
+    # Look for SKU block after "SKU" header
+    sku_section = re.search(r'SKU\s+(?:Size\s+)?(?:Qty\s+)?.*?\n([\s\S]{1,300}?)(?:\n\s*\n|\Z)', full_text, re.I)
+    if sku_section:
+        sku_lines = sku_section.group(1).strip().split('\n')
+        sku_parts = []
+        for line in sku_lines:
+            line = line.strip()
+            if not line:
+                break
+            # First line is main SKU
+            if not sku_parts:
+                # Take everything up to "Free Size" or tab
+                main = re.split(r'\s{2,}|Free Size|free size', line)[0].strip()
+                if main:
+                    sku_parts.append(main)
+            else:
+                # Continuation only if contains + or /
+                if '+' in line or '/' in line:
+                    sku_parts.append(line.strip())
+                else:
                     break
+        sku = '+'.join(sku_parts) if sku_parts else ''
+
+    # Fallback: find line after "SKU" keyword
+    if not sku:
+        for i, line in enumerate(lines):
+            if line.strip().upper() == 'SKU' or line.strip().upper().startswith('SKU '):
+                for j in range(i+1, min(i+4, len(lines))):
+                    candidate = lines[j].strip()
+                    if candidate and not re.match(r'^(Size|Qty|Free)', candidate, re.I):
+                        sku = candidate.split()[0]
+                        break
+                break
+
+    data['sku'] = sku
+
+    # ============ QTY ============
+    qty_m = re.search(r'Free Size\s+(\d+)', full_text)
+    if qty_m:
+        data['qty'] = qty_m.group(1)
+    else:
+        qty_m2 = re.search(r'Qty[:\s]+(\d+)', full_text, re.I)
+        if qty_m2:
+            data['qty'] = qty_m2.group(1)
+
+    # ============ CUSTOMER & ADDRESS ============
+    customer = ''
+    address_parts = []
+    for i, line in enumerate(lines):
+        if re.search(r'customer\s+address|ship\s+to|deliver\s+to', line, re.I):
+            for j in range(i+1, min(i+8, len(lines))):
+                candidate = lines[j].strip()
+                if not candidate:
+                    continue
+                # Skip courier/system lines
+                skip_words = ['shadowfax','delhivery','ekart','cod','pickup','valmo',
+                              'prepaid','meesho','flipkart','amazon','return','undelivered',
+                              'phone','mobile','weight','dimensions']
+                if any(w in candidate.lower() for w in skip_words):
+                    continue
+                if re.match(r'^\d{6}$', candidate):  # pure pincode line
+                    continue
+                if not customer:
+                    customer = candidate
+                else:
+                    address_parts.append(candidate)
+                    if len(address_parts) >= 3:
+                        break
             break
 
-    # State & PIN
-    state_m = re.search(r',\s*([A-Za-z\s&]+),\s*(\d{6})', text)
+    data['customer'] = customer
+    data['address'] = ', '.join(address_parts[:3])
+
+    # ============ STATE & PIN ============
+    state_m = re.search(r',\s*([A-Za-z\s&]+),\s*(\d{6})', full_text)
     if state_m:
         data['state'] = state_m.group(1).strip()
         data['pin'] = state_m.group(2).strip()
+    else:
+        pin_m = re.search(r'\b(\d{6})\b', full_text)
+        if pin_m:
+            data['pin'] = pin_m.group(1)
 
-    # Qty
-    qty_m = re.search(r'Free Size\s+(\d+)', text)
-    if qty_m:
-        data['qty'] = qty_m.group(1)
-
-    # SKU image lookup
+    # ============ PRODUCT IMAGE & COST from DB ============
     if data['sku']:
         try:
             conn = get_db()
             prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
-            if not prod:
-                prod = conn.execute("SELECT image_url, cost FROM products WHERE sku LIKE ? LIMIT 1", (data['sku'][:12]+'%',)).fetchone()
             if prod:
                 data['product_image'] = prod['image_url'] or ''
                 data['cost'] = str(prod['cost'] or '')
@@ -205,6 +322,7 @@ def parse_page_text(text):
         except: pass
 
     return data
+
 
 def parse_pdf(pdf_path):
     results = []
@@ -224,10 +342,10 @@ def parse_pdf(pdf_path):
                         if parsed2:
                             results.append(parsed2)
                             i += 1
-                except Exception as e:
+                except Exception:
                     pass
                 i += 1
-    except Exception as e:
+    except Exception:
         pass
     return results
 
@@ -278,7 +396,7 @@ def get_summary():
                     'shipped':shipped,'today':today_count,
                     'platforms':platforms,'couriers':couriers,'status_counts':statuses})
 
-# ============ ORDERS ============
+# ============ ORDERS — with date filter ============
 @app.route('/api/orders')
 @login_required
 def get_orders():
@@ -288,6 +406,9 @@ def get_orders():
     status = request.args.get('status','').strip()
     platform = request.args.get('platform','').strip()
     courier = request.args.get('courier','').strip()
+    date_from = request.args.get('date_from','').strip()   # YYYY-MM-DD
+    date_to = request.args.get('date_to','').strip()       # YYYY-MM-DD
+    batch = request.args.get('batch','').strip()
     offset = (page-1)*per_page
     where, params = [], []
     if search:
@@ -297,6 +418,9 @@ def get_orders():
     if status: where.append("status=?"); params.append(status)
     if platform: where.append("platform=?"); params.append(platform)
     if courier: where.append("courier=?"); params.append(courier)
+    if batch: where.append("batch=?"); params.append(batch)
+    if date_from: where.append("batch >= ?"); params.append(date_from)
+    if date_to: where.append("batch <= ?"); params.append(date_to)
     wc = "WHERE "+" AND ".join(where) if where else ""
     conn = get_db()
     total = conn.execute(f"SELECT COUNT(*) FROM orders {wc}", params).fetchone()[0]
@@ -314,7 +438,7 @@ def update_status():
     conn.execute("UPDATE orders SET status=?,updated_at=datetime('now','localtime') WHERE awb=?", (status,awb))
     conn.commit()
     conn.close()
-    log_action(session.get('user','?'), 'STATUS_UPDATE', f"AWB:{awb}>{status}")
+    log_action(session.get('user','?'), 'STATUS_UPDATE', f"AWB:{awb}→{status}")
     return jsonify({'success':True})
 
 @app.route('/api/orders/bulk_status', methods=['POST'])
@@ -337,7 +461,7 @@ def scan_zip():
     if 'file' not in request.files:
         return jsonify({'error':'No file uploaded'}), 400
     f = request.files['file']
-    batch_date = request.form.get('batch_date', datetime.now().strftime('%d-%m-%Y'))
+    batch_date = request.form.get('batch_date', datetime.now().strftime('%Y-%m-%d'))
     tmp_dir = os.path.join(UPLOAD_FOLDER, 'tmp_'+datetime.now().strftime('%Y%m%d%H%M%S'))
     os.makedirs(tmp_dir, exist_ok=True)
     try:
@@ -349,7 +473,7 @@ def scan_zip():
                 z.extractall(tmp_dir)
             pdf_files = []
             for root,dirs,files in os.walk(tmp_dir):
-                for fn in files:
+                for fn in sorted(files):
                     if fn.lower().endswith('.pdf'):
                         pdf_files.append(os.path.join(root,fn))
         elif fname.lower().endswith('.pdf'):
@@ -359,17 +483,25 @@ def scan_zip():
 
         conn = get_db()
         existing_awbs = {r[0] for r in conn.execute("SELECT awb FROM orders").fetchall()}
+        existing_order_ids = {r[0] for r in conn.execute("SELECT order_id FROM orders WHERE order_id!=''").fetchall()}
         conn.close()
 
         all_results = []
+        seen_in_batch = set()  # dedupe within same ZIP
         for pdf_path in pdf_files:
             parsed_list = parse_pdf(pdf_path)
             for parsed in parsed_list:
                 parsed['batch'] = batch_date
                 parsed['status'] = 'Pending'
                 parsed['scanned_by'] = session.get('name','')
-                parsed['is_duplicate'] = parsed.get('awb','') in existing_awbs
                 parsed['filename'] = os.path.basename(pdf_path)
+                awb = parsed.get('awb','')
+                oid = parsed.get('order_id','')
+                # Mark duplicate: AWB already in DB OR order_id already in DB OR duplicate in same ZIP
+                is_dup = (awb in existing_awbs) or (oid and oid in existing_order_ids) or (awb in seen_in_batch)
+                parsed['is_duplicate'] = is_dup
+                if not is_dup:
+                    seen_in_batch.add(awb)
                 all_results.append(parsed)
 
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -386,10 +518,13 @@ def scan_confirm():
     orders = data.get('orders',[])
     conn = get_db()
     existing = {r[0] for r in conn.execute("SELECT awb FROM orders").fetchall()}
+    existing_oids = {r[0] for r in conn.execute("SELECT order_id FROM orders WHERE order_id!=''").fetchall()}
     added = skipped = 0
     for o in orders:
         awb = o.get('awb','').strip()
-        if not awb or awb in existing:
+        oid = o.get('order_id','').strip()
+        # Skip if AWB or Order ID already exists
+        if not awb or awb in existing or (oid and oid in existing_oids):
             skipped += 1
             continue
         try:
@@ -399,15 +534,17 @@ def scan_confirm():
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (o.get('order_date',''),o.get('customer',''),o.get('address',''),
                  o.get('state',''),o.get('pin',''),o.get('sku',''),o.get('qty','1'),
-                 o.get('invoice_no',''),awb,o.get('order_id',''),
+                 o.get('invoice_no',''),awb,oid,
                  o.get('courier',''),float(o.get('amount',0) or 0),
                  o.get('payment','COD'),o.get('batch',''),'SAI Enterprises',
                  o.get('platform',''),'Pending',
                  float(o.get('cost',0) or 0),o.get('product_image',''),
                  o.get('scanned_by','')))
             existing.add(awb)
+            if oid: existing_oids.add(oid)
             added += 1
-        except: skipped += 1
+        except Exception as e:
+            skipped += 1
     conn.commit()
     conn.close()
     log_action(session.get('user','?'), 'SCAN_CONFIRM', f"Added:{added} Skipped:{skipped}")
@@ -564,7 +701,7 @@ def export_csv():
     return Response(output.getvalue(), mimetype='text/csv',
                     headers={'Content-Disposition': f'attachment; filename=orders_{datetime.now().strftime("%d%b%Y")}.csv'})
 
-# ============ PRODUCT LOOKUP (SKU Scanner) ============
+# ============ PRODUCT LOOKUP ============
 @app.route('/api/product/lookup')
 @login_required
 def product_lookup():
