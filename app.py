@@ -93,8 +93,6 @@ def log_action(username, action, details=''):
         conn.commit()
         conn.close()
     except: pass
-
-# ============ FIXED PARSE FUNCTION ============
 def parse_page_text(text):
     data = {
         'awb':'','order_id':'','customer':'','address':'',
@@ -109,17 +107,17 @@ def parse_page_text(text):
     lines = [l.strip() for l in text.split('\n')]
     full_text = text
 
-    # ============ COURIER DETECT FIRST (needed for AWB pattern) ============
+    # ============ COURIER DETECT FIRST ============
     courier = ''
     if re.search(r'shadowfax', full_text, re.I):
         courier = 'Shadowfax'
     elif re.search(r'delhivery', full_text, re.I):
         courier = 'Delhivery'
-    elif re.search(r'ekart|flipkart', full_text, re.I):
+    elif re.search(r'e-kart|ekart|E-Kart Logistics', full_text, re.I):
         courier = 'Ekart'
     elif re.search(r'valmoplus', full_text, re.I):
         courier = 'ValmoPlus'
-    elif re.search(r'valmo', full_text, re.I):
+    elif re.search(r'\bvalmo\b', full_text, re.I):
         courier = 'Valmo'
     elif re.search(r'xpressbees', full_text, re.I):
         courier = 'XpressBees'
@@ -127,43 +125,55 @@ def parse_page_text(text):
         courier = 'BlueDart'
     data['courier'] = courier
 
-    # ============ AWB — courier-specific patterns ============
-    awb = ''
+    # ============ PLATFORM ============
+    if re.search(r'flipkart', full_text, re.I):
+        data['platform'] = 'Flipkart'
+    elif re.search(r'meesho|sold by', full_text, re.I):
+        data['platform'] = 'Meesho'
+    elif re.search(r'amazon', full_text, re.I):
+        data['platform'] = 'Amazon'
 
+    # ============ AWB ============
+    awb = ''
     if courier == 'Shadowfax':
-        # SF followed by digits
-        m = re.search(r'(SF\d{10,})', full_text)
+        m = re.search(r'\b(SF\d{10,})\b', full_text)
         if m: awb = m.group(1)
 
     elif courier == 'Delhivery':
-        # Delhivery AWB = 14-16 digit number (NOT 18+ digit Meesho Order ID)
-        for m in re.finditer(r'\b(\d{14,16})\b', full_text):
+        # 14-16 digit only
+        for m in re.finditer(r'\b(\d{16})\b', full_text):
             awb = m.group(1)
             break
-
-    elif courier in ('Valmo', 'ValmoPlus'):
-        # VL prefix or long numeric
-        m = re.search(r'(VL\d{9,})', full_text, re.I)
-        if m:
-            awb = m.group(1)
-        else:
-            for m in re.finditer(r'\b(\d{14,18})\b', full_text):
+        if not awb:
+            for m in re.finditer(r'\b(\d{14,15})\b', full_text):
                 awb = m.group(1)
                 break
 
     elif courier == 'Ekart':
-        # FMPP or similar
-        m = re.search(r'(FMPP\w+)', full_text, re.I)
+        # AWB No. FMPC... or FMPP... from label
+        m = re.search(r'AWB\s+No\.\s+(FM[A-Z0-9]+)', full_text, re.I)
+        if m:
+            awb = m.group(1)
+        else:
+            m = re.search(r'\b(FM(?:PC|PP)[A-Z0-9]{6,})\b', full_text, re.I)
+            if m: awb = m.group(1)
+        # Also check bottom barcode line
+        if not awb:
+            for line in lines:
+                if re.match(r'^FMPC\d+$|^FMPP\d+$', line.strip()):
+                    awb = line.strip()
+                    break
+
+    elif courier in ('Valmo', 'ValmoPlus'):
+        m = re.search(r'\b(VL\d{9,})\b', full_text, re.I)
         if m:
             awb = m.group(1)
         else:
             for m in re.finditer(r'\b(\d{14,18})\b', full_text):
                 awb = m.group(1)
                 break
-
     else:
-        # Generic fallback — prefer SF prefix, then 14-16 digit
-        m = re.search(r'(SF\d{10,})', full_text)
+        m = re.search(r'\b(SF\d{10,})\b', full_text)
         if m:
             awb = m.group(1)
         else:
@@ -175,36 +185,30 @@ def parse_page_text(text):
         return None
     data['awb'] = awb
 
-    # ============ ORDER ID — Meesho style: 18+ digits optionally _1 ============
-    m = re.search(r'\b(\d{18,20}(?:_\d+)?)\b', full_text)
-    if m and m.group(1) != awb:
-        data['order_id'] = m.group(1)
+    # ============ ORDER ID ============
+    if data['platform'] == 'Flipkart':
+        # OD prefix
+        m = re.search(r'\b(OD\d{16,})\b', full_text, re.I)
+        if m: data['order_id'] = m.group(1)
     else:
-        # Try "Purchase Order No" pattern
-        m2 = re.search(r'Purchase Order No[.\s]*\n?(\d+)', full_text, re.IGNORECASE)
-        if m2:
-            data['order_id'] = m2.group(1)
-
-    # ============ PLATFORM ============
-    if re.search(r'meesho|sold by', full_text, re.I):
-        data['platform'] = 'Meesho'
-    elif re.search(r'flipkart', full_text, re.I):
-        data['platform'] = 'Flipkart'
-    elif re.search(r'amazon', full_text, re.I):
-        data['platform'] = 'Amazon'
+        # Meesho: 18-20 digit + optional _1
+        m = re.search(r'\b(\d{18,20}(?:_\d+)?)\b', full_text)
+        if m and m.group(1) != awb:
+            data['order_id'] = m.group(1)
+        else:
+            m2 = re.search(r'Purchase Order No[.\s]*\n?(\d+)', full_text, re.IGNORECASE)
+            if m2: data['order_id'] = m2.group(1)
 
     # ============ INVOICE & DATE ============
     inv_m = re.search(r'Invoice No[.\s:]*([A-Z0-9\-/]+)', full_text, re.I)
     if inv_m:
         data['invoice_no'] = inv_m.group(1).strip()
-
     date_m = re.search(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}-\d{2}-\d{2})', full_text)
     if date_m:
         data['order_date'] = date_m.group(1)
 
-    # ============ AMOUNT — improved ============
+    # ============ AMOUNT ============
     amount = ''
-    # Pattern 1: Grand Total / Total Amount
     for pat in [
         r'Grand\s+Total[\s:₹Rs.]*(\d+\.?\d*)',
         r'Total\s+Amount[\s:₹Rs.]*(\d+\.?\d*)',
@@ -216,8 +220,172 @@ def parse_page_text(text):
         m = re.search(pat, full_text, re.I)
         if m:
             val = float(m.group(1))
-            # Sanity check: amount should be between 50 and 9999
             if 50 <= val <= 9999:
+                amount = str(val)
+                break
+    data['amount'] = amount
+    data['payment'] = 'Prepaid' if re.search(r'prepaid', full_text, re.I) else 'COD'
+
+    # ============ SKU ============
+    sku = ''
+
+    if data['platform'] == 'Flipkart':
+        # Format: "1 14PCS+TULIP+CRMMMM | description" in SKU ID table
+        # Try pipe-separated: number|SKU|description
+        m = re.search(r'^\s*\d\s*[\|]\s*([A-Z0-9][A-Z0-9+/\-]{3,})\s*[\|]', full_text, re.MULTILINE)
+        if m:
+            sku = m.group(1).strip()
+        else:
+            # Try from "SKU ID | Description" section
+            m2 = re.search(r'SKU ID.*?\n\s*\d\s*[\|]?\s*([A-Z0-9][A-Z0-9+/\-]{3,})', full_text, re.I|re.DOTALL)
+            if m2:
+                sku = m2.group(1).strip()
+        # Also check product description for SKU pattern like 14PCS+TULIP+CRMMMM
+        if not sku:
+            m3 = re.search(r'\b(\d{1,2}PCS[+/A-Z0-9\-]+)\b', full_text)
+            if m3: sku = m3.group(1)
+    else:
+        # Meesho/Shadowfax: SKU after "SKU Size Qty" table header
+        # Find all lines that look like SKU (alphanumeric + + /)
+        sku_started = False
+        sku_parts = []
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if re.search(r'SKU\s+Size|^SKU$', stripped, re.I):
+                sku_started = True
+                continue
+            if sku_started:
+                if not stripped:
+                    break
+                # Skip "Free Size N" lines - but capture qty
+                if re.match(r'Free Size', stripped, re.I):
+                    break
+                # First SKU line
+                if not sku_parts:
+                    # Remove trailing size/qty info
+                    sku_line = re.split(r'\s+Free|\s+\d+$', stripped)[0].strip()
+                    if sku_line and re.search(r'[A-Z0-9]', sku_line):
+                        sku_parts.append(sku_line)
+                else:
+                    # Continuation lines with + or /
+                    if '+' in stripped or '/' in stripped:
+                        sku_parts.append(stripped)
+                    else:
+                        break
+
+        if sku_parts:
+            sku = '+'.join(sku_parts)
+
+        # Fallback: find SKU pattern directly
+        if not sku:
+            # NEW16PCS+CTC+GOLDEN style
+            m = re.search(r'\b((?:NEW|MS|DTC|LS)?(?:\d+PCS|\d+PC)[A-Z0-9+/\-]+)\b', full_text)
+            if m: sku = m.group(1)
+
+        # Another fallback: line after "SKU" keyword
+        if not sku:
+            for i, line in enumerate(lines):
+                if line.strip().upper().startswith('SKU'):
+                    for j in range(i+1, min(i+4, len(lines))):
+                        c = lines[j].strip()
+                        if c and not re.match(r'^(Size|Qty|Free|\d+$)', c, re.I):
+                            sku = c.split()[0]
+                            break
+                    break
+
+    data['sku'] = sku
+
+    # ============ QTY ============
+    qty_m = re.search(r'Free Size\s+(\d+)', full_text)
+    if qty_m:
+        data['qty'] = qty_m.group(1)
+    else:
+        qty_m2 = re.search(r'TOTAL QTY[:\s]+(\d+)', full_text, re.I)
+        if qty_m2: data['qty'] = qty_m2.group(1)
+
+    # ============ CUSTOMER & ADDRESS ============
+    customer = ''
+    address_parts = []
+
+    if data['platform'] == 'Flipkart':
+        # "Name: Sonali Dhikar,"
+        m = re.search(r'Name:\s*([^\n,]+)', full_text, re.I)
+        if m:
+            customer = m.group(1).strip().rstrip(',')
+        # Address after Name line
+        name_pos = full_text.find('Shipping/Customer address:')
+        if name_pos == -1:
+            name_pos = full_text.find('Name:')
+        if name_pos >= 0:
+            addr_block = full_text[name_pos:]
+            addr_lines = [l.strip() for l in addr_block.split('\n') if l.strip()]
+            skip = ['hbd','cpd','sold by','gstin','sku id','not for resale',
+                    'use transparent','shipping/customer','name:','e-kart','flipkart']
+            collecting = False
+            for al in addr_lines:
+                al_low = al.lower()
+                if 'name:' in al_low:
+                    collecting = True
+                    continue
+                if not collecting:
+                    continue
+                if any(s in al_low for s in skip):
+                    continue
+                if re.match(r'^(HBD|CPD|STD)', al):
+                    break
+                address_parts.append(al.rstrip(','))
+                if len(address_parts) >= 3:
+                    break
+    else:
+        # Meesho/Shadowfax: "Customer Address" block
+        for i, line in enumerate(lines):
+            if re.search(r'customer\s+address|ship\s+to|deliver\s+to', line, re.I):
+                for j in range(i+1, min(i+8, len(lines))):
+                    candidate = lines[j].strip()
+                    if not candidate:
+                        continue
+                    skip_words = ['shadowfax','delhivery','ekart','cod','pickup','valmo',
+                                  'prepaid','meesho','flipkart','amazon','return',
+                                  'undelivered','phone','mobile','weight','dimensions']
+                    if any(w in candidate.lower() for w in skip_words):
+                        continue
+                    if re.match(r'^\d{6}$', candidate):
+                        continue
+                    if not customer:
+                        customer = candidate
+                    else:
+                        address_parts.append(candidate)
+                        if len(address_parts) >= 3:
+                            break
+                break
+
+    data['customer'] = customer
+    data['address'] = ', '.join(address_parts[:3])
+
+    # ============ STATE & PIN ============
+    state_m = re.search(r',\s*([A-Za-z\s&]+),\s*(\d{6})', full_text)
+    if state_m:
+        data['state'] = state_m.group(1).strip()
+        data['pin'] = state_m.group(2).strip()
+    else:
+        pin_m = re.search(r'\b(\d{6})\b', full_text)
+        if pin_m: data['pin'] = pin_m.group(1)
+
+    # ============ PRODUCT IMAGE & COST ============
+    if data['sku']:
+        try:
+            conn = get_db()
+            prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1",
+                                (data['sku'],)).fetchone()
+            if prod:
+                data['product_image'] = prod['image_url'] or ''
+                data['cost'] = str(prod['cost'] or '')
+            conn.close()
+        except: pass
+
+    return data
+
+
                 amount = str(val)
                 break
     data['amount'] = amount
