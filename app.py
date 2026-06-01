@@ -194,7 +194,7 @@ def parse_page_text(text):
     # SKU image lookup
     if data['sku']:
         try:
-           prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
+          prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1", (data['sku'],)).fetchone()
             if not prod:
                 prod = conn.execute("SELECT image_url, cost FROM products WHERE sku LIKE ? LIMIT 1", (data['sku'][:12]+'%',)).fetchone()
             if prod:
