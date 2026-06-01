@@ -959,15 +959,11 @@ function renderDispatchLog() {
     log.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Koi order scan nahi hua abhi</div>';
     return;
   }
-  log.innerHTML = dispatchLog.map(item => `
-    <div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-family:monospace;font-size:13px;color:var(--success)">${item.awb}</span>
-      <span style="font-size:11px;color:var(--muted)">${item.time}</span>
-    </div>`).join('');
+ 
 }
 
 function clearDispatchLog() {
-  dispatchLog = [];
+  dispatchLog = [];log.innerHTML = dispatchLog.map(item => `<div style="display:flex;gap:12px;align-items:center;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;margin-bottom:8px;">${item.image?`<img src="${item.image}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;">` : '<div style="font-size:40px;">📦</div>'}<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">✅ ${item.awb}</div><div style="font-size:12px;font-weight:600;margin-top:4px;">${item.sku||'—'}</div><div style="font-size:12px;color:var(--muted);">Customer: ${item.customer||'—'}</div><div style="font-size:12px;color:var(--muted);">Cost: ₹${item.cost||'—'} | Price: ₹${item.amount||'—'}</div></div><div style="font-size:11px;color:var(--muted);">${item.time}</div></div>`).join('');
   renderDispatchLog();
 }
 
