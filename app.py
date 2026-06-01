@@ -126,8 +126,8 @@ def parse_page_text(text):
     # AWB
     awb = ''
     if courier == 'Shadowfax':
-       m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
-        if m: awb = m.group(1)
+        m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
+         if m: awb = m.group(1)
     elif courier == 'Delhivery':
         for m in re.finditer(r'\b(\d{16})\b', full_text):
             awb = m.group(1); break
