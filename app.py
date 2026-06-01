@@ -108,7 +108,7 @@ def parse_page_text(text):
     lines = text.split('\n')
 
     # AWB
-    for pat in [r'(SF\d{10,}[A-Z0-9]*)', r'(\d{18,20})', r'([A-Z]{2,4}\d{9,15})']:
+    for pat in [r'(SF\d{10,}[A-Z0-9]*)', r'(VL\d{13,})', r'\b(149\d{13})\b', r'([A-Z]{2,4}\d{9,15})']:
         m = re.search(pat, text)
         if m:
             data['awb'] = m.group(1)
