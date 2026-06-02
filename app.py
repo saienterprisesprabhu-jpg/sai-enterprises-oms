@@ -150,7 +150,7 @@ def parse_page_text(text):
         else:
             for m in re.finditer(r'\b(\d{14,18})\b', full_text):
                 awb = m.group(1); break
-   else:
+    else:
         for m in re.finditer(r'\b(\d{14,16})\b', full_text):
             awb = m.group(1); break
     if not awb: return None
