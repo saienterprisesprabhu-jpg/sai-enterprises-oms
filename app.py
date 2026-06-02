@@ -458,7 +458,7 @@ def scan_zip():
                 awb = parsed.get('awb','')
                 oid = parsed.get('order_id','')
                 # Mark duplicate: AWB already in DB OR order_id already in DB OR duplicate in same ZIP
-                is_dup = (awb in existing_awbs) or (oid and oid in existing_order_ids) or (awb in seen_in_batch)
+                is_dup = (awb in existing_awbs) or (awb in seen_in_batch)
                 parsed['is_duplicate'] = is_dup
                 if not is_dup:
                     seen_in_batch.add(awb)
