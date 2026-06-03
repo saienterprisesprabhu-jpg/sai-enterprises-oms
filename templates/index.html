@@ -680,11 +680,9 @@ async function updateStatus(awb, status) {
 function showOrderDetail(o) {
   const modal = document.getElementById('order-modal');
   const keys = Object.keys(o).filter(k=>o[k]&&o[k]!=='nan'&&o[k]!=='');
-  document.getElementById('modal-content').innerHTML = '
+  document.getElementById('modal-content').innerHTML`=`
     
-    <div class="detail-grid">${keys.map(k=>`
-      <div class="detail-item"><div class="key">${k}</div><div class="val">${o[k]}</div></div>`).join('')}
-    </div>`;
+    <div class="detail-grid">${keys.map(k=>`<div class="detail-item"><div class="key">${k}</div><div class="val">${o[k]}</div></div>`).join('')}</div>`;
   modal.classList.add('show');
 }
 function closeModal() { document.getElementById('order-modal').classList.remove('show'); }
