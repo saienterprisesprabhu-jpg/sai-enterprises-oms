@@ -5,3 +5,1841 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import pdfplumber
 import pandas as pd
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAI Enterprises Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#e94560;--accent2:#4fa3e0;--text:#e6edf3;--muted:#8b949e;--success:#3fb950;--warning:#d29922;--danger:#f85149;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh;}
+/* Sidebar */
+.sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;transition:transform 0.3s;}
+.sidebar-logo{padding:20px;border-bottom:1px solid var(--border);}
+.sidebar-logo h2{color:var(--accent);font-size:16px;font-weight:800;letter-spacing:1px;}
+.sidebar-logo p{color:var(--muted);font-size:11px;margin-top:2px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:12px 20px;cursor:pointer;color:var(--muted);font-size:14px;transition:all 0.2s;border-left:3px solid transparent;}
+.nav-item:hover,.nav-item.active{color:var(--text);background:rgba(233,69,96,0.1);border-left-color:var(--accent);}
+.nav-item span{font-size:18px;}
+.nav-divider{height:1px;background:var(--border);margin:8px 0;}
+.user-info{margin-top:auto;padding:16px 20px;border-top:1px solid var(--border);}
+.user-info .name{font-size:13px;font-weight:600;}
+.user-info .role{font-size:11px;color:var(--muted);}
+.logout-btn{width:100%;padding:8px;background:rgba(248,81,73,0.1);border:1px solid var(--danger);color:var(--danger);border-radius:6px;cursor:pointer;font-size:12px;margin-top:8px;transition:all 0.2s;}
+.logout-btn:hover{background:var(--danger);color:#fff;}
+/* Main */
+.main{margin-left:220px;min-height:100vh;}
+.topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--card);position:sticky;top:0;z-index:90;}
+.topbar h1{font-size:18px;font-weight:700;}
+.topbar-right{display:flex;align-items:center;gap:12px;}
+.content{padding:24px;}
+/* Tabs */
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+/* Cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;transition:all 0.2s;}
+.stat-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.stat-card .label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.stat-card .value{font-size:28px;font-weight:800;}
+.stat-card .sub{font-size:11px;color:var(--muted);margin-top:4px;}
+/* Table */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.table-header h3{font-size:15px;font-weight:700;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;}
+input[type=text],select{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:8px 12px;font-size:13px;outline:none;transition:all 0.2s;}
+input[type=text]:focus,select:focus{border-color:var(--accent2);}
+select option{background:var(--card);}
+.btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#c62a47;}
+.btn-success{background:var(--success);color:#fff;}
+.btn-secondary{background:rgba(255,255,255,0.08);color:var(--text);border:1px solid var(--border);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:rgba(255,255,255,0.04);padding:10px 12px;text-align:left;color:var(--muted);font-weight:600;font-size:12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:middle;}
+tr:hover td{background:rgba(255,255,255,0.03);}
+/* Status badges */
+.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-pending{background:rgba(210,153,34,0.2);color:var(--warning);}
+.badge-delivered{background:rgba(63,185,80,0.2);color:var(--success);}
+.badge-rto{background:rgba(248,81,73,0.2);color:var(--danger);}
+.badge-shipped{background:rgba(79,163,224,0.2);color:var(--accent2);}
+.badge-lost{background:rgba(139,148,158,0.2);color:var(--muted);}
+.badge-cancelled{background:rgba(139,148,158,0.15);color:var(--muted);}
+/* Scanner */
+.scanner-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;}
+.scanner-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;}
+.scanner-card h3{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.upload-zone{border:2px dashed var(--border);border-radius:12px;padding:40px;text-align:center;cursor:pointer;transition:all 0.3s;}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(233,69,96,0.05);}
+.upload-zone input{display:none;}
+.upload-zone p{color:var(--muted);font-size:14px;margin-top:8px;}
+.progress-bar{height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin:12px 0;}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;transition:width 0.3s;}
+/* Scan results */
+.scan-result-item{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start;}
+.scan-result-item.duplicate{border-color:var(--warning);background:rgba(210,153,34,0.08);}
+.scan-result-item.error{border-color:var(--danger);background:rgba(248,81,73,0.08);}
+.product-img{width:60px;height:60px;object-fit:cover;border-radius:8px;border:1px solid var(--border);}
+.product-img-placeholder{width:60px;height:60px;background:rgba(255,255,255,0.05);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.scan-info{flex:1;min-width:0;}
+.scan-info .awb{font-size:13px;font-weight:700;color:var(--accent2);}
+.scan-info .detail{font-size:12px;color:var(--muted);margin-top:2px;}
+/* Return scanner */
+.return-form{display:flex;flex-direction:column;gap:14px;}
+.form-row{display:flex;gap:12px;}
+.form-group{flex:1;}
+.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;}
+.form-group input,.form-group select,.form-group textarea{width:100%;}
+textarea{background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:10px;font-size:13px;resize:vertical;outline:none;}
+/* Photo upload */
+.photo-upload-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;}
+.photo-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.photo-preview img{width:70px;height:70px;object-fit:cover;border-radius:6px;border:1px solid var(--border);}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;align-items:center;justify-content:center;}
+.modal-overlay.show{display:flex;}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto;}
+.modal h3{font-size:18px;font-weight:700;margin-bottom:20px;}
+.modal-close{float:right;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.detail-item .key{font-size:11px;color:var(--muted);margin-bottom:3px;}
+.detail-item .val{font-size:14px;font-weight:600;}
+/* Pagination */
+.pagination{display:flex;align-items:center;gap:8px;padding:16px 20px;border-top:1px solid var(--border);}
+.page-btn{padding:6px 12px;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:13px;}
+.page-btn:hover,.page-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.page-info{color:var(--muted);font-size:13px;}
+/* Charts */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.chart-card h4{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--muted);}
+.bar-chart{display:flex;flex-direction:column;gap:8px;}
+.bar-row{display:flex;align-items:center;gap:10px;}
+.bar-label{width:100px;font-size:12px;color:var(--muted);text-align:right;flex-shrink:0;}
+.bar-track{flex:1;background:rgba(255,255,255,0.06);border-radius:3px;height:20px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:700;color:#fff;transition:width 0.6s;}
+.bar-val{width:50px;font-size:12px;color:var(--muted);}
+/* Notification */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 20px;font-size:14px;z-index:9999;transform:translateY(100px);opacity:0;transition:all 0.3s;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.success{border-color:var(--success);color:var(--success);}
+.toast.error{border-color:var(--danger);color:var(--danger);}
+/* Mobile */
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:22px;cursor:pointer;}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);}
+  .sidebar.open{transform:translateX(0);}
+  .main{margin-left:0;}
+  .scanner-grid{grid-template-columns:1fr;}
+  .chart-grid{grid-template-columns:1fr;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);}
+  .hamburger{display:block;}
+  .detail-grid{grid-template-columns:1fr;}
+}
+.loading{text-align:center;padding:40px;color:var(--muted);}
+.spinner{display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <h2>🏢 SAI ENTERPRISES</h2>
+    <p>Order Management System</p>
+  </div>
+  <div class="nav-item active" onclick="showTab('dashboard')"><span>📊</span> Dashboard</div>
+  <div class="nav-item" onclick="showTab('scanner')"><span>📦</span> Scanner</div>
+  <div class="nav-item" onclick="showTab('dispatch')"><span>🚚</span> Dispatch Scanner</div>
+  <div class="nav-item" onclick="showTab('orders')"><span>📋</span> All Orders</div>
+  <div class="nav-item" onclick="showTab('returns')"><span>🔄</span> Returns & RTO</div>
+  <div class="nav-item" onclick="showTab('claims')"><span>📝</span> Claims</div>
+  <div class="nav-item" onclick="showTab('products')"><span>🏷️</span> Products/SKU</div>
+  <div class="nav-item" onclick="showTab('skuscanner')"><span>🔍</span> SKU Scanner</div>
+  {% if role == 'admin' %}
+  <div class="nav-divider"></div>
+  <div class="nav-item" onclick="showTab('finance')"><span>💰</span> Finance & P&L</div>
+  <div class="nav-item" onclick="showTab('fraud')"><span>🚨</span> Fraud</div>
+  {% endif %}
+  <div class="user-info">
+    <div class="name">👤 {{ user }}</div>
+    <div class="role">{{ role|upper }}</div>
+    <button class="logout-btn" onclick="window.location='/logout'">Logout</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" onclick="toggleSidebar()">☰</button>
+      <h1 id="page-title">📊 Dashboard</h1>
+    </div>
+    <div class="topbar-right">
+      {% if role == 'admin' %}
+      <button class="btn btn-secondary btn-sm" onclick="downloadExcel()">⬇ Excel</button>
+      {% endif %}
+      <span style="font-size:12px;color:var(--muted)" id="clock"></span>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- DASHBOARD TAB -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="stats-grid" id="stats-grid">
+        <div class="loading"><div class="spinner"></div></div>
+      </div>
+      <div class="chart-grid" id="charts-area"></div>
+    </div>
+
+    <!-- SCANNER TAB -->
+    <div class="tab-pane" id="tab-scanner">
+      <div class="scanner-grid">
+        <!-- Pending Order Scanner -->
+        <div class="scanner-card">
+          <h3>📦 Pending Order Scanner</h3>
+          <div class="upload-zone" id="zip-drop-zone" onclick="document.getElementById('zip-file').click()">
+            <div style="font-size:40px;">📂</div>
+            <p><strong>Click or drag ZIP / PDF here</strong></p>
+            <p>Multiple labels — upload ZIP file</p>
+            <input type="file" id="zip-file" accept=".zip,.pdf" onchange="handleZipUpload(this)">
+          </div>
+          <div style="margin-top:12px;">
+            <label style="font-size:12px;color:var(--muted);">Batch Date</label>
+            <input type="date" id="batch-date" style="width:100%;margin-top:4px;" value="">
+          </div>
+          <div class="progress-bar" id="scan-progress-bar" style="display:none;">
+            <div class="progress-fill" id="scan-progress" style="width:0%"></div>
+          </div>
+          <div id="scan-status" style="font-size:13px;color:var(--muted);margin-top:8px;"></div>
+        </div>
+
+        <!-- Return / RTO Scanner -->
+        <div class="scanner-card">
+          <h3>🔄 Return / RTO Scanner</h3>
+          <div class="return-form">
+            <div class="form-group">
+              <label>AWB Number *</label>
+              <input type="text" id="return-awb" placeholder="Enter AWB / Tracking No">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Condition</label>
+                <select id="return-condition">
+                  <option value="Good">Good</option>
+                  <option value="Damaged">Damaged</option>
+                  <option value="Tampered">Tampered / Opened</option>
+                  <option value="Empty">Empty Box</option>
+                  <option value="Wrong Item">Wrong Item</option>
+                  <option value="Missing Item">Missing Item</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Remark</label>
+                <input type="text" id="return-remark" placeholder="Note...">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Upload Photos (Packet, Label, Damage proof)</label>
+              <div class="photo-upload-zone" onclick="document.getElementById('return-photos').click()">
+                <div style="font-size:30px">📸</div>
+                <p style="font-size:13px;color:var(--muted);margin-top:4px;">Camera / Gallery / Multiple photos</p>
+                <input type="file" id="return-photos" accept="image/*" multiple capture="environment" style="display:none" onchange="previewPhotos(this)">
+              </div>
+              <div class="photo-preview" id="photo-preview"></div>
+            </div>
+            <button class="btn btn-primary" onclick="submitReturn()" style="width:100%">✅ Submit Return Scan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scan Results -->
+      <div id="scan-results-section" style="display:none;">
+        <div class="table-card">
+          <div class="table-header">
+            <h3>📋 Scan Results</h3>
+            <div style="display:flex;gap:8px;">
+              <span id="scan-count" style="font-size:13px;color:var(--muted);align-self:center;"></span>
+              <button class="btn btn-success" onclick="confirmScan()">✅ Confirm & Save All</button>
+              <button class="btn btn-secondary" onclick="clearScanResults()">✖ Clear</button>
+            </div>
+          </div>
+          <div style="padding:16px;" id="scan-results-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div class="tab-pane" id="tab-orders">
+      <div class="table-card">
+        <div class="table-header">
+          <h3>📋 All Orders</h3>
+          <div class="filters">
+            <input type="text" id="order-search" placeholder="🔍 Search AWB, Order ID, Customer..." style="width:240px" oninput="debounceSearch()">
+            <select id="filter-status" onchange="loadOrders()">
+              <option value="">All Status</option>
+              <option>Pending</option><option>Shipped</option><option>Delivered</option>
+              <option>RTO Initiated</option><option>RTO Received</option>
+              <option>Lost</option><option>Damaged</option><option>Cancelled</option>
+            </select>
+            <select id="filter-platform" onchange="loadOrders()">
+              <option value="">All Platforms</option>
+              <option>Meesho</option><option>Flipkart</option><option>Amazon</option>
+            </select>
+            <select id="filter-courier" onchange="loadOrders()">
+              <option value="">All Couriers</option>
+              <option>Shadowfax</option><option>Delhivery</option><option>Ekart</option>
+              <option>Valmo</option><option>XpressBees</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Date</th><th>AWB</th><th>Order ID</th>
+                <th>Customer</th><th>SKU</th><th>Amount</th>
+                <th>Platform</th><th>Courier</th><th>Batch</th><th>Status</th><th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="orders-tbody">
+              <tr><td colspan="12" class="loading"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="orders-pagination"></div>
+      </div>
+    </div>
+
+    <!-- DISPATCH SCANNER TAB -->
+    <div class="tab-pane" id="tab-dispatch">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+        
+        <!-- QR/Barcode Scanner -->
+        <div class="scanner-card">
+          <h3>🚚 Dispatch Scanner — Pending → Shipped</h3>
+          <div style="margin-bottom:16px;padding:14px;background:rgba(79,163,224,0.1);border:1px solid rgba(79,163,224,0.3);border-radius:10px;font-size:13px;color:var(--accent2);">
+            📱 Mobile pe camera se QR/Barcode scan karo ya AWB manually type karo
+          </div>
+          
+          <!-- Camera QR Scanner -->
+          <div style="margin-bottom:16px;">
+            <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:8px;">📷 Camera se QR Scan (Mobile)</label>
+            <div id="qr-preview-container" style="display:none;width:100%;max-width:300px;margin:0 auto;">
+              <video id="qr-video" style="width:100%;border-radius:10px;border:2px solid var(--accent2);"></video>
+              <button class="btn btn-secondary" onclick="stopQRScan()" style="width:100%;margin-top:8px;">⏹ Stop Camera</button>
+            </div>
+            <button class="btn btn-secondary" id="start-qr-btn" onclick="startQRScan()" style="width:100%;">📷 Start Camera Scan</button>
+          </div>
+          
+          <!-- Manual AWB Input -->
+          <div class="form-group" style="margin-bottom:12px;">
+            <label style="font-size:12px;color:var(--muted);">✍️ AWB / Packet ID manually enter karo</label>
+            <div style="display:flex;gap:8px;margin-top:6px;">
+              <input type="text" id="dispatch-awb" placeholder="AWB ya Packet ID..." style="flex:1;" onkeydown="if(event.key==='Enter')dispatchScan()">
+              <button class="btn btn-primary" onclick="dispatchScan()">✅ Scan</button>
+            </div>
+          </div>
+
+          <!-- Bulk Mode -->
+          <div style="margin-top:16px;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;">
+            <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;cursor:pointer;">
+              <input type="checkbox" id="bulk-mode" onchange="toggleBulkMode()"> 
+              <span>🔄 Bulk Mode — Ek ke baad ek scan karo (auto-clear)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Scan Log -->
+        <div class="scanner-card">
+          <h3>📋 Dispatch Log — Aaj ke Scanned Orders</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <span id="dispatch-count" style="font-size:13px;color:var(--muted);">0 orders shipped</span>
+            <button class="btn btn-secondary btn-sm" onclick="clearDispatchLog()">🗑 Clear Log</button>
+          </div>
+          <div id="dispatch-log" style="max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">
+              Koi order scan nahi hua abhi
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Today's Pending Orders Quick View -->
+      <div class="table-card">
+        <div class="table-header">
+          <h3>⏳ Pending Orders — Dispatch Karne Hain</h3>
+          <div style="display:flex;gap:8px;">
+            <span id="pending-count" style="font-size:13px;color:var(--warning);align-self:center;"></span>
+            <button class="btn btn-secondary btn-sm" onclick="loadPendingOrders()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>AWB</th><th>Customer</th><th>SKU</th><th>Amount</th><th>Courier</th><th>Batch</th><th>Action</th></tr>
+            </thead>
+            <tbody id="pending-tbody">
+              <tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RETURNS TAB -->
+    <div class="tab-pane" id="tab-returns">
+      <div class="table-card">
+        <div class="table-header"><h3>🔄 Returns & RTO</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="returns-thead"></tr></thead>
+            <tbody id="returns-tbody"><tr><td class="loading"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLAIMS TAB -->
+    <div class="tab-pane" id="tab-claims">
+      <div class="table-card">
+        <div class="table-header"><h3>📝 Claims Tracker</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="claims-thead"></tr></thead>
+            <tbody id="claims-tbody"><tr><td class="loading"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <!-- SKU SCANNER TAB -->
+<div class="tab-pane" id="tab-skuscanner">
+  <div class="scanner-grid">
+    <div class="scanner-card">
+      <h3>🔍 SKU Product Scanner</h3>
+      <div style="margin-bottom:16px;padding:14px;background:rgba(79,163,224,0.1);border:1px solid rgba(79,163,224,0.3);border-radius:10px;font-size:13px;color:var(--accent2);">
+        📱 Camera se product ka barcode scan karo ya SKU manually type karo
+      </div>
+      <div style="margin-bottom:16px;">
+        <div id="sku-camera-container" style="display:none;width:100%;max-width:320px;margin:0 auto 12px;">
+          <video id="sku-video" style="width:100%;border-radius:10px;border:2px solid var(--accent2);"></video>
+          <button class="btn btn-secondary" onclick="stopSKUScan()" style="width:100%;margin-top:8px;">⏹ Stop Camera</button>
+        </div>
+        <button class="btn btn-secondary" id="start-sku-btn" onclick="startSKUScan()" style="width:100%;margin-bottom:12px;">📷 Camera se Scan Karo</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="sku-input" placeholder="SKU type karo ya scan karo..." style="flex:1;" onkeydown="if(event.key==='Enter')lookupSKU()">
+        <button class="btn btn-primary" onclick="lookupSKU()">🔍 Search</button>
+      </div>
+    </div>
+
+    <div class="scanner-card" id="sku-result-card" style="display:none;">
+      <h3>📦 Product Details</h3>
+      <div id="sku-result"></div>
+    </div>
+  </div>
+
+  <div id="sku-history" style="margin-top:20px;"></div>
+</div>
+    <!-- PRODUCTS TAB -->
+    <div class="tab-pane" id="tab-products">
+      <div class="table-card">
+        <div class="table-header">
+          <h3>🏷️ Products / SKU Database</h3>
+          <input type="text" id="product-search" placeholder="🔍 Search SKU..." oninput="filterProducts()" style="width:220px">
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Image</th><th>SKU</th><th>Store</th><th>Platform</th><th>Cost</th><th>Price</th><th>RTO%</th><th>Return%</th><th>Status</th></tr>
+            </thead>
+            <tbody id="products-tbody">
+              <tr><td colspan="9" class="loading"><div class="spinner"></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANCE TAB (admin only) -->
+    <div class="tab-pane" id="tab-finance">
+      <div class="table-card">
+        <div class="table-header"><h3>💰 Finance & P&L</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="finance-thead"></tr></thead>
+            <tbody id="finance-tbody"><tr><td class="loading"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRAUD TAB (admin only) -->
+    <div class="tab-pane" id="tab-fraud">
+      <div class="table-card">
+        <div class="table-header"><h3>🚨 Fraud & Suspicious Orders</h3></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr id="fraud-thead"></tr></thead>
+            <tbody id="fraud-tbody"><tr><td class="loading"><div class="spinner"></div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="order-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h3>📦 Order Details</h3>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const ROLE = '{{ role }}';
+let allOrders = [];
+let currentPage = 1;
+let totalOrders = 0;
+let scanResults = [];
+let allProducts = [];
+let searchTimer = null;
+
+// Clock
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN');
+}, 1000);
+
+// Today date default
+document.getElementById('batch-date').value = new Date().toISOString().split('T')[0];
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');document.getElementById('tab-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+  const titles = {dashboard:'📊 Dashboard',scanner:'📦 Scanner',dispatch:'🚚 Dispatch Scanner',orders:'📋 All Orders',
+    returns:'🔄 Returns & RTO',claims:'📝 Claims',products:'🏷️ Products/SKU',
+    finance:'💰 Finance & P&L',fraud:'🚨 Fraud',skuscanner:'🔍 SKU Scanner'};
+  document.getElementById('page-title').textContent = titles[tab] || tab;
+  if(tab==='orders') loadOrders();
+  if(tab==='dispatch') loadPendingOrders();
+  if(tab==='returns') loadReturns();
+  if(tab==='claims') loadClaims();
+  if(tab==='products') loadProducts();
+  if(tab==='finance') loadFinance();
+  if(tab==='fraud') loadFraud();
+   if(tab==='skuscanner') document.getElementById('sku-input').focus(); 
+  
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard() {
+  const r = await fetch('/api/summary');
+  const data = await r.json();
+  const sg = document.getElementById('stats-grid');
+  const statColor = (val, max) => {
+    const pct = Math.min((val/max)*100, 100);
+    return pct > 60 ? '#3fb950' : pct > 30 ? '#d29922' : '#e94560';
+  };
+  sg.innerHTML = `
+    <div class="stat-card"><div class="label">Total Orders</div><div class="value" style="color:#4fa3e0">${(data.total||0).toLocaleString()}</div><div class="sub">All time</div></div>
+    <div class="stat-card"><div class="label">Pending</div><div class="value" style="color:#d29922">${(data.pending||0).toLocaleString()}</div><div class="sub">Awaiting dispatch</div></div>
+    <div class="stat-card"><div class="label">Delivered</div><div class="value" style="color:#3fb950">${(data.delivered||0).toLocaleString()}</div><div class="sub">Successfully delivered</div></div>
+    <div class="stat-card"><div class="label">RTO</div><div class="value" style="color:#f85149">${(data.rto||0).toLocaleString()}</div><div class="sub">Return to origin</div></div>
+    <div class="stat-card"><div class="label">Shipped</div><div class="value" style="color:#a371f7">${(data.shipped||0).toLocaleString()}</div><div class="sub">In transit</div></div>
+  `;
+
+  // Charts
+  const ca = document.getElementById('charts-area');
+  const platforms = data.platforms || {};
+  const couriers = data.couriers || {};
+  const statuses = data.status_counts || {};
+  const colors = ['#4fa3e0','#e94560','#3fb950','#d29922','#a371f7','#f0883e'];
+  
+  function barChart(title, obj) {
+    const total = Object.values(obj).reduce((a,b)=>a+(+b||0),0);
+    const rows = Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([k,v],i)=>`
+      <div class="bar-row">
+        <div class="bar-label">${k||'—'}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${total?Math.round(v/total*100):0}%;background:${colors[i%colors.length]}">${v}</div></div>
+        <div class="bar-val">${total?Math.round(v/total*100):0}%</div>
+      </div>`).join('');
+    return `<div class="chart-card"><h4>${title}</h4><div class="bar-chart">${rows}</div></div>`;
+  }
+  ca.innerHTML = barChart('Platform Distribution', platforms) + barChart('Courier Distribution', couriers) +
+    barChart('Status Overview', statuses);
+}
+
+// ============ ORDERS ============
+function debounceSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(loadOrders, 400);
+}
+
+async function loadOrders(page=1) {
+  currentPage = page;
+  const search = document.getElementById('order-search').value;
+  const status = document.getElementById('filter-status').value;
+  const platform = document.getElementById('filter-platform').value;
+  const courier = document.getElementById('filter-courier').value;
+  const tbody = document.getElementById('orders-tbody');
+  tbody.innerHTML = '<tr><td colspan="12" class="loading"><div class="spinner"></div></td></tr>';
+  
+  const params = new URLSearchParams({page:page, per_page:50, search:search, status:status, platform:platform, courier:courier});
+  const r = await fetch('/api/orders?' + params);
+  const data = await r.json();
+  totalOrders = data.total;
+  
+  if(!data.orders.length) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--muted)">No orders found</td></tr>';
+    return;
+  }
+  
+  tbody.innerHTML = data.orders.map(o => {
+    const st = o.status||'Pending';
+    const stClass = st==='Delivered'?'delivered':st.includes('RTO')?'rto':st==='Pending'?'pending':st==='Shipped'||st==='In Transit'?'shipped':'lost';
+    const statusOpts = ['Pending','Picked Up','In Transit','Delivered','RTO Initiated','RTO Received','Lost','Damaged','Fake Delivery','Cancelled'];
+    const detail = JSON.stringify(o).replace(/"/g,'&quot;');
+    return `<tr onclick="showOrderDetail(${detail})">
+      <td>${o.id||''}</td>
+      <td style="white-space:nowrap;font-size:11px">${o.order_date||''}</td>
+      <td><span style="font-size:11px;font-family:monospace;color:var(--accent2)">${o.awb||''}</span></td>
+      <td style="font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.order_id||''}</td>
+      <td style="font-size:12px">${o.customer||'—'}</td>
+      <td style="font-size:11px">${o.sku||''}</td>
+      <td>₹${o.amount||''}</td>
+      <td><span style="font-size:11px">${o.platform||''}</span></td>
+      <td><span style="font-size:11px">${o.courier||''}</span></td>
+      <td style="font-size:11px">${o.batch||''}</td>
+      <td onclick="event.stopPropagation()">
+        <select class="badge badge-${stClass}" style="background:transparent;border:none;cursor:pointer;font-size:11px" onchange="updateStatus('${o.awb}',this.value)">
+          ${statusOpts.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <button class="btn btn-secondary btn-sm" onclick="showOrderDetail(${detail})">👁</button>
+      </td>
+    </tr>`;
+  }).join('');
+  
+  // Pagination
+  const totalPages = Math.ceil(totalOrders/100);
+  const pg = document.getElementById('orders-pagination');
+  let html = `<span class="page-info">Total: <strong>${totalOrders.toLocaleString()}</strong> orders</span>&nbsp;&nbsp;`;
+  if(page>1) html+=`<button class="page-btn" onclick="loadOrders(${page-1})">← Prev</button>`;
+  html+=`<span class="page-info">Page ${page} of ${totalPages}</span>`;
+  if(page<totalPages) html+=`<button class="page-btn" onclick="loadOrders(${page+1})">Next →</button>`;
+  pg.innerHTML = html;
+}
+
+async function updateStatus(awb, status) {
+  const r = await fetch('/api/orders/update_status', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({awb, status})
+  });
+  const d = await r.json();
+  if(d.success) toast('✅ Status updated: ' + status);
+  else toast('❌ Error: ' + d.error, 'error');
+}
+
+function showOrderDetail(o) {
+  const modal = document.getElementById('order-modal');
+  const keys = Object.keys(o).filter(k=>o[k]&&o[k]!=='nan'&&o[k]!=='');
+  document.getElementById('modal-content').innerHTML = 
+    <div class="detail-grid">${keys.map(k=>``
+    <div class="detail-grid">${keys.map(k=>`
+      <div class="detail-item"><div class="key">${k}</div><div class="val">${o[k]}</div></div>`).join('')}
+    </div>`;
+  modal.classList.add('show');
+}
+function closeModal() { document.getElementById('order-modal').classList.remove('show'); }
+
+// ============ SCANNER ============
+function handleZipUpload(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const batchDate = document.getElementById('batch-date').value;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('batch_date', batchDate);
+
+  document.getElementById('scan-progress-bar').style.display='block';
+  document.getElementById('scan-progress').style.width='10%';
+  document.getElementById('scan-status').textContent = '⏳ Uploading & parsing PDFs...';
+  document.getElementById('scan-results-section').style.display='none';
+
+  fetch('/api/scan/zip', {method:'POST', body:formData})
+    .then(r=>r.json())
+    .then(data=>{
+      document.getElementById('scan-progress').style.width='100%';
+      if(data.error) {
+        document.getElementById('scan-status').textContent = '❌ Error: ' + data.error;
+        toast('Error: ' + data.error, 'error');
+        return;
+      }
+      scanResults = data.results;
+      document.getElementById('scan-status').textContent = `✅ Parsed ${data.total} labels`;
+      renderScanResults(data.results);
+    })
+    .catch(e=>{
+      document.getElementById('scan-status').textContent = '❌ Upload failed';
+      toast('Upload failed', 'error');
+    });
+}
+
+function renderScanResults(results) {
+  document.getElementById('scan-results-section').style.display='block';
+  document.getElementById('scan-count').textContent = `${results.length} orders scanned`;
+  const dup = results.filter(r=>r.is_duplicate).length;
+  const list = document.getElementById('scan-results-list');
+  list.innerHTML = `<div style="margin-bottom:12px;font-size:13px;color:var(--muted)">
+    📦 Total: <strong>${results.length}</strong> &nbsp;|&nbsp; 
+    ⚠️ Duplicates (will skip): <strong style="color:var(--warning)">${dup}</strong> &nbsp;|&nbsp; 
+    ✅ New: <strong style="color:var(--success)">${results.length-dup}</strong></div>` +
+    results.map((r,i)=>`
+    <div class="scan-result-item ${r.is_duplicate?'duplicate':''}">
+      ${r.product_image 
+        ? `<img src="${r.product_image}" class="product-img" onerror="this.style.display='none'">`
+        : `<div class="product-img-placeholder">📦</div>`}
+      <div class="scan-info">
+        <div class="awb">${r.awb||'⚠️ AWB not found'} 
+          ${r.is_duplicate?'<span style="color:var(--warning);font-size:11px"> ⚠️ DUPLICATE</span>':''}</div>
+        <div class="detail">Order: ${r.order_id||'—'} | SKU: ${r.sku||'—'} | ₹${r.amount||'—'} ${r.payment||''}</div>
+        <div class="detail">Customer: ${r.customer||'—'} | ${r.state||''} ${r.pin||''}</div>
+        <div class="detail">${r.courier||'—'} | ${r.platform||'—'} | Batch: ${r.batch||'—'}</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);text-align:right;">
+        <span class="badge badge-pending">Pending</span>
+      </div>
+    </div>`).join('');
+}
+
+async function confirmScan() {
+  if(!scanResults.length) { toast('No scan results to save', 'error'); return; }
+  const btn = event.currentTarget;
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+  const r = await fetch('/api/scan/confirm', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({orders: scanResults})
+  });
+  const data = await r.json();
+  btn.disabled = false; btn.textContent = '✅ Confirm & Save All';
+  if(data.success) {
+    toast(`✅ Saved ${data.added} orders! (${data.skipped} duplicates skipped)`);
+    clearScanResults();
+  } else {
+    toast('❌ Error: ' + data.error, 'error');
+  }
+}
+
+function clearScanResults() {
+  scanResults = [];
+  document.getElementById('scan-results-section').style.display='none';
+  document.getElementById('scan-status').textContent='';
+  document.getElementById('scan-progress-bar').style.display='none';
+  document.getElementById('scan-progress').style.width='0%';
+  document.getElementById('zip-file').value='';
+}
+
+function previewPhotos(input) {
+  const preview = document.getElementById('photo-preview');
+  preview.innerHTML='';
+  for(const f of input.files) {
+    const url = URL.createObjectURL(f);
+    preview.innerHTML += `<img src="${url}" alt="photo">`;
+  }
+}
+
+async function submitReturn() {
+  const awb = document.getElementById('return-awb').value.trim();
+  if(!awb) { toast('Please enter AWB number', 'error'); return; }
+  const formData = new FormData();
+  formData.append('awb', awb);
+  formData.append('condition', document.getElementById('return-condition').value);
+  formData.append('remark', document.getElementById('return-remark').value);
+  const photos = document.getElementById('return-photos').files;
+  for(const p of photos) formData.append('photos', p);
+
+  const btn = event.currentTarget;
+  btn.disabled=true; btn.textContent='⏳ Submitting...';
+  const r = await fetch('/api/scan/return', {method:'POST', body:formData});
+  const data = await r.json();
+  btn.disabled=false; btn.textContent='✅ Submit Return Scan';
+  if(data.success) {
+    toast(data.updated ? '✅ Return recorded for AWB: '+awb : '⚠️ AWB not found in master, but photos saved');
+    document.getElementById('return-awb').value='';
+    document.getElementById('return-remark').value='';
+    document.getElementById('return-photos').value='';
+    document.getElementById('photo-preview').innerHTML='';
+  } else {
+    toast('❌ Error: '+data.error, 'error');
+  }
+}
+
+// Drag & drop
+const dz = document.getElementById('zip-drop-zone');
+dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('dragover');});
+dz.addEventListener('dragleave', ()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if(file){
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('zip-file').files = dt.files;
+    handleZipUpload(document.getElementById('zip-file'));
+  }
+});
+
+// ============ RETURNS ============
+async function loadReturns() {
+  const r = await fetch('/api/returns');
+  const data = await r.json();
+  renderGenericTable(data.returns||[], 'returns');
+}
+
+// ============ CLAIMS ============
+async function loadClaims() {
+  const r = await fetch('/api/claims');
+  const data = await r.json();
+  renderGenericTable(data.claims||[], 'claims');
+}
+
+// ============ FINANCE ============
+async function loadFinance() {
+  const r = await fetch('/api/finance');
+  if(r.status===403){document.getElementById('finance-tbody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted)">🔒 Admin access only</td></tr>';return;}
+  const data = await r.json();
+  renderGenericTable(data.finance||[], 'finance');
+}
+
+// ============ FRAUD ============
+async function loadFraud() {
+  const r = await fetch('/api/fraud');
+  const data = await r.json();
+  renderGenericTable(data.fraud||[], 'fraud');
+}
+
+function renderGenericTable(rows, id) {
+  if(!rows.length){
+    document.getElementById(id+'-tbody').innerHTML=`<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--muted)">No data found</td></tr>`;
+    return;
+  }
+  const cols = Object.keys(rows[0]);
+  document.getElementById(id+'-thead').innerHTML = cols.map(c=>`<th>${c}</th>`).join('');
+  document.getElementById(id+'-tbody').innerHTML = rows.map(row=>
+    `<tr>${cols.map(c=>`<td>${row[c]||''}</td>`).join('')}</tr>`
+  ).join('');
+}
+
+// ============ PRODUCTS ============
+async function loadProducts() {
+  const r = await fetch('/api/products');
+  const data = await r.json();
+  allProducts = data.products || [];
+  renderProducts(allProducts);
+}
+
+function filterProducts() {
+  const q = document.getElementById('product-search').value.toLowerCase();
+  renderProducts(allProducts.filter(p=>(p.sku||'').toLowerCase().includes(q)||(p.store_name||'').toLowerCase().includes(q)));
+}
+
+function renderProducts(products) {
+  document.getElementById('products-tbody').innerHTML = products.slice(0,200).map(p=>`
+    <tr>
+      <td>${p.image_url?`<img src="${p.image_url}" style="width:45px;height:45px;object-fit:cover;border-radius:6px;" onerror="this.style.display='none'">`:'—'}</td>
+      <td style="font-size:12px;font-weight:600">${p.sku||''}</td>
+      <td style="font-size:12px">${p.store_name||''}</td>
+      <td><span class="badge badge-shipped">${p.platform||''}</span></td>
+      <td>₹${p.cost||''}</td>
+      <td>₹${p.selling_price||''}</td>
+      <td style="color:${parseFloat(p.rto_per||0)>20?'var(--danger)':'var(--success)'}">${p.rto_per||'0'}%</td>
+      <td>${p.ret_per||'0'}%</td>
+      <td><span class="badge ${p.status==='ACTIVE'?'badge-delivered':'badge-cancelled'}">${p.status||''}</span></td>
+    </tr>`).join('');
+}
+
+async function downloadExcel() {
+  window.open('/api/download/excel');
+}
+
+// ============ DISPATCH SCANNER ============
+let dispatchLog = [];
+let qrStream = null;
+let bulkMode = false;
+
+function toggleBulkMode() {
+  bulkMode = document.getElementById('bulk-mode').checked;
+}
+
+async function dispatchScan() {
+  const awb = document.getElementById('dispatch-awb').value.trim();
+  if(!awb) { toast('AWB enter karo!', 'error'); return; }
+  
+  const r = await fetch('/api/orders/update_status', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({awb: awb, status: 'Shipped'})
+  });
+  const data = await r.json();
+  
+  if(data.success) {
+    // Product details fetch karo
+    const orderR = await fetch('/api/orders?search=' + encodeURIComponent(awb) + '&per_page=1');
+    const orderData = await orderR.json();
+    const order = orderData.orders && orderData.orders[0];
+    console.log('Order data:', order);
+    let productHTML = '';
+    if(order && order.sku) {
+      const prodR = await fetch('/api/product/lookup?sku=' + encodeURIComponent(order.sku));
+      const prodData = await prodR.json();
+      if(prodData.found) {
+        const p = prodData.product;
+        productHTML = `
+          <div style="display:flex;gap:12px;align-items:center;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;margin-bottom:8px;">
+            ${p.image_url ? `<img src="${p.image_url}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:2px solid var(--success);">` : '<div style="font-size:40px;">📦</div>'}
+            <div>
+              <div style="font-size:13px;font-weight:700;color:var(--success);">✅ Shipped: ${awb}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">SKU: <strong>${p.sku}</strong></div>
+              <div style="font-size:12px;color:var(--muted);">Cost: ₹${p.cost} | Price: ₹${p.selling_price}</div>
+              <div style="font-size:12px;color:var(--muted);">Customer: ${order.customer||'—'}</div>
+            </div>
+          </div>`;
+      }
+    }
+    
+    if(!productHTML) {
+      productHTML = `<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+        <span style="font-family:monospace;font-size:13px;color:var(--success);">✅ ${awb}</span>
+      </div>`;
+    }
+    
+   dispatchLog.unshift({awb, time: new Date().toLocaleTimeString('en-IN'), image: order ? order.product_image : '', sku: order ? order.sku : '', customer: order ? order.customer : '', cost: order ? order.cost : '', amount: order ? order.amount : ''});
+    renderDispatchLog();
+    toast('✅ Shipped: ' + awb);
+    
+    const row = document.getElementById('row-' + awb.replace(/[^a-zA-Z0-9]/g,''));
+    if(row) row.remove();
+    
+    const countEl = document.getElementById('pending-count');
+    const current = parseInt(countEl.textContent) || 0;
+    countEl.textContent = (current - 1) + ' pending';
+    
+    if(bulkMode) {
+      document.getElementById('dispatch-awb').value = '';
+      document.getElementById('dispatch-awb').focus();
+    }
+  } else {
+    toast('❌ AWB not found: ' + awb, 'error');
+  }
+}
+
+function renderDispatchLog() {
+  const log = document.getElementById('dispatch-log');
+  document.getElementById('dispatch-count').textContent = dispatchLog.length + ' orders shipped';
+  if(!dispatchLog.length) {
+    log.innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Koi order scan nahi hua abhi</div>';
+    return;
+  }
+ 
+}
+
+function clearDispatchLog() {
+  dispatchLog = [];log.innerHTML = dispatchLog.map(item => `<div style="display:flex;gap:12px;align-items:center;background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:10px;padding:12px;margin-bottom:8px;">${item.image?`<img src="${item.image}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;">` : '<div style="font-size:40px;">📦</div>'}<div style="flex:1;"><div style="font-size:12px;font-weight:700;color:var(--success);">✅ ${item.awb}</div><div style="font-size:12px;font-weight:600;margin-top:4px;">${item.sku||'—'}</div><div style="font-size:12px;color:var(--muted);">Customer: ${item.customer||'—'}</div><div style="font-size:12px;color:var(--muted);">Cost: ₹${item.cost||'—'} | Price: ₹${item.amount||'—'}</div></div><div style="font-size:11px;color:var(--muted);">${item.time}</div></div>`).join('');
+  renderDispatchLog();
+}
+
+async function loadPendingOrders() {
+  const tbody = document.getElementById('pending-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" class="loading"><div class="spinner"></div></td></tr>';
+  const r = await fetch('/api/orders?status=Pending&per_page=200&page=1');
+  const data = await r.json();
+  document.getElementById('pending-count').textContent = (data.total||0) + ' pending';
+  if(!data.orders || !data.orders.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Koi pending order nahi!</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.orders.map(o => `
+    <tr id="row-${(o.awb||'').replace(/[^a-zA-Z0-9]/g,'')}">
+      <td><span style="font-family:monospace;font-size:11px;color:var(--accent2)">${o.awb||''}</span></td>
+      <td style="font-size:12px">${o.customer||'—'}</td>
+      <td style="font-size:11px">${o.sku||''}</td>
+      <td>₹${o.amount||''}</td>
+      <td style="font-size:12px">${o.courier||''}</td>
+      <td style="font-size:11px">${o.batch||''}</td>
+      <td>
+        <button class="btn btn-success btn-sm" onclick="quickShip('${o.awb}')">🚚 Ship</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function quickShip(awb) {
+  document.getElementById('dispatch-awb').value = awb;
+  await dispatchScan();
+}
+
+// QR Camera Scanner
+async function startQRScan() {
+  try {
+    document.getElementById('qr-preview-container').style.display = 'block';
+    document.getElementById('start-qr-btn').style.display = 'none';
+    
+    const video = document.getElementById('qr-video');
+    qrStream = await navigator.mediaDevices.getUserMedia({video: {facingMode: 'environment'}});
+    video.srcObject = qrStream;
+    video.play();
+    
+    toast('📷 Camera started — packet ka QR scan karo!');
+    
+    // Use BarcodeDetector if available
+    if('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector();
+      const scanInterval = setInterval(async () => {
+        try {
+          const barcodes = await detector.detect(video);
+          if(barcodes.length > 0) {
+            const awb = barcodes[0].rawValue;
+            document.getElementById('dispatch-awb').value = awb;
+            clearInterval(scanInterval);
+            stopQRScan();
+            await dispatchScan();
+          }
+        } catch(e) {}
+      }, 500);
+    } else {
+      toast('⚠️ Camera on hai — AWB manually type karo ya QR reader app use karo', 'error');
+    }
+  } catch(e) {
+    toast('❌ Camera access nahi mila: ' + e.message, 'error');
+    stopQRScan();
+  }
+}
+
+function stopQRScan() {
+  if(qrStream) {
+    qrStream.getTracks().forEach(t => t.stop());
+    qrStream = null;
+  }
+  document.getElementById('qr-preview-container').style.display = 'none';
+  document.getElementById('start-qr-btn').style.display = 'block';
+}
+// ============ SKU SCANNER ============
+let skuStream = null;
+let skuHistory = [];
+
+async function lookupSKU() {
+  const sku = document.getElementById('sku-input').value.trim();
+  if(!sku) { toast('SKU enter karo!', 'error'); return; }
+  
+  const r = await fetch('/api/product/lookup?sku=' + encodeURIComponent(sku));
+  const data = await r.json();
+  
+  const card = document.getElementById('sku-result-card');
+  const result = document.getElementById('sku-result');
+  card.style.display = 'block';
+  
+  if(data.found) {
+    const p = data.product;
+    const profit = ((p.selling_price||0) - (p.cost||0)).toFixed(0);
+    const margin = p.selling_price ? (((p.selling_price-p.cost)/p.selling_price)*100).toFixed(1) : 0;
+    result.innerHTML = `
+      <div style="text-align:center;margin-bottom:16px;">
+        ${p.image_url ? `<img src="${p.image_url}" style="width:120px;height:120px;object-fit:cover;border-radius:12px;border:2px solid var(--accent2);">` : '<div style="font-size:60px;">📦</div>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">SKU</div>
+          <div style="font-size:13px;font-weight:700;color:var(--accent2);">${p.sku||'—'}</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Platform</div>
+          <div style="font-size:13px;font-weight:700;">${p.platform||'—'}</div>
+        </div>
+        <div style="background:rgba(248,81,73,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Cost Price</div>
+          <div style="font-size:20px;font-weight:800;color:var(--danger);">₹${p.cost||'—'}</div>
+        </div>
+        <div style="background:rgba(63,185,80,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Selling Price</div>
+          <div style="font-size:20px;font-weight:800;color:var(--success);">₹${p.selling_price||'—'}</div>
+        </div>
+        <div style="background:rgba(79,163,224,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Profit</div>
+          <div style="font-size:20px;font-weight:800;color:var(--accent2);">₹${profit}</div>
+        </div>
+        <div style="background:rgba(163,113,247,0.15);border-radius:10px;padding:12px;">
+          <div style="font-size:11px;color:var(--muted);">Margin</div>
+          <div style="font-size:20px;font-weight:800;color:#a371f7;">${margin}%</div>
+        </div>
+      </div>`;
+    skuHistory.unshift({sku: p.sku, price: p.selling_price, cost: p.cost, image: p.image_url, time: new Date().toLocaleTimeString('en-IN')});
+    renderSKUHistory();
+    toast('✅ Product found: ' + p.sku);
+  } else {
+    result.innerHTML = `<div style="text-align:center;padding:30px;color:var(--danger);">❌ SKU not found: <strong>${sku}</strong></div>`;
+    toast('SKU not found!', 'error');
+  }
+  document.getElementById('sku-input').value = '';
+}
+
+function renderSKUHistory() {
+  if(!skuHistory.length) return;
+  document.getElementById('sku-history').innerHTML = `
+    <div class="table-card">
+      <div class="table-header"><h3>📋 Scan History</h3></div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:8px;">
+        ${skuHistory.slice(0,10).map(h=>`
+          <div style="display:flex;align-items:center;gap:12px;background:rgba(255,255,255,0.03);border-radius:8px;padding:10px;">
+            ${h.image?`<img src="${h.image}" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">`:'<div style="font-size:24px;">📦</div>'}
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:700;color:var(--accent2);">${h.sku}</div>
+              <div style="font-size:12px;color:var(--muted);">Cost: ₹${h.cost} | Price: ₹${h.price}</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);">${h.time}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
+async function startSKUScan() {
+  try {
+    document.getElementById('sku-camera-container').style.display = 'block';
+    document.getElementById('start-sku-btn').style.display = 'none';
+    const video = document.getElementById('sku-video');
+    skuStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject = skuStream;
+    video.play();
+    if('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector();
+      const interval = setInterval(async()=>{
+        try {
+          const codes = await detector.detect(video);
+          if(codes.length>0) {
+            document.getElementById('sku-input').value = codes[0].rawValue;
+            clearInterval(interval);
+            stopSKUScan();
+            lookupSKU();
+          }
+        } catch(e){}
+      }, 500);
+    } else {
+      toast('⚠️ Camera on — SKU manually type karo', 'error');
+    }
+  } catch(e) {
+    toast('❌ Camera access nahi mila', 'error');
+    stopSKUScan();
+  }
+}
+
+function stopSKUScan() {
+  if(skuStream) { skuStream.getTracks().forEach(t=>t.stop()); skuStream=null; }
+  document.getElementById('sku-camera-container').style.display = 'none';
+  document.getElementById('start-sku-btn').style.display = 'block';
+}
+// Init
+loadDashboard();
+</script>
+</body>
+</html>
+
+app = Flask(__name__)
+app.secret_key = 'sai_enterprises_2026_secret_key_xyz'
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, 'data')
+DB_PATH = os.path.join(DATA_DIR, 'sai_enterprises.db')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'static', 'uploads')
+IMAGES_FOLDER = os.path.join(BASE_DIR, 'static', 'images')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(IMAGES_FOLDER, exist_ok=True)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_date TEXT, customer TEXT, address TEXT, state TEXT, pin TEXT,
+            sku TEXT, qty TEXT DEFAULT '1', invoice_no TEXT, awb TEXT UNIQUE,
+            order_id TEXT, courier TEXT, amount REAL, payment TEXT DEFAULT 'COD',
+            batch TEXT, entity TEXT DEFAULT 'SAI Enterprises', platform TEXT,
+            status TEXT DEFAULT 'Pending', cost REAL, settlement REAL, pnl REAL,
+            fin_note TEXT, return_awb TEXT, rto TEXT, dto TEXT, wrong_return TEXT,
+            claim_date TEXT, claim_recd_date TEXT, claim_amt REAL,
+            return_remark TEXT, fraud TEXT, photo TEXT, product_image TEXT,
+            scanned_by TEXT, created_at TEXT DEFAULT current_timestamp,
+            updated_at TEXT DEFAULT current_timestamp
+        );
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku TEXT, store_name TEXT, platform TEXT, category TEXT,
+            cost REAL, selling_price REAL, image_url TEXT, status TEXT,
+            rto_per REAL, ret_per REAL, inventory INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS staff_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT, action TEXT, details TEXT,
+            created_at TEXT DEFAULT current_timestamp
+        );
+        CREATE TABLE IF NOT EXISTS returns (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            awb TEXT, condition TEXT, remark TEXT, photos TEXT,
+            scanned_by TEXT, created_at TEXT DEFAULT current_timestamp
+        );
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+USERS = {
+    'admin':  {'password': 'sai@admin2026', 'role': 'admin',  'name': 'Admin (Lalit)'},
+    'staff1': {'password': 'staff@123',     'role': 'staff',  'name': 'Staff 1'},
+    'staff2': {'password': 'staff@456',     'role': 'staff',  'name': 'Staff 2'},
+}
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        if session.get('role') != 'admin':
+            return jsonify({'error': 'Admin only'}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+def log_action(username, action, details=''):
+    try:
+        conn = get_db()
+        conn.execute("INSERT INTO staff_log (username,action,details) VALUES (?,?,?)", (username,action,details))
+        conn.commit()
+        conn.close()
+    except: pass
+
+# ============ FIXED PARSE FUNCTION ============
+def parse_page_text(text):
+    data = {
+        'awb':'','order_id':'','customer':'','address':'',
+        'state':'','pin':'','sku':'','qty':'1',
+        'amount':'','payment':'COD','courier':'',
+        'platform':'','invoice_no':'','order_date':'',
+        'product_image':'','cost':''
+    }
+    if not text or len(text.strip()) < 20:
+        return None
+    lines = [l.strip() for l in text.split('\n')]
+    full_text = text
+
+    # COURIER
+    courier = ''
+    if re.search(r'shadowfax', full_text, re.I): courier = 'Shadowfax'
+    elif re.search(r'delhivery', full_text, re.I): courier = 'Delhivery'
+    elif re.search(r'e-kart|E-Kart Logistics', full_text, re.I): courier = 'Ekart'
+    elif re.search(r'valmoplus', full_text, re.I): courier = 'ValmoPlus'
+    elif re.search(r'\bvalmo\b', full_text, re.I): courier = 'Valmo'
+    elif re.search(r'xpressbees', full_text, re.I): courier = 'XpressBees'
+    data['courier'] = courier
+
+    # PLATFORM
+    if re.search(r'flipkart', full_text, re.I): data['platform'] = 'Flipkart'
+    elif re.search(r'meesho|sold by', full_text, re.I): data['platform'] = 'Meesho'
+    elif re.search(r'amazon', full_text, re.I): data['platform'] = 'Amazon'
+
+    # AWB
+    awb = ''
+    if courier == 'Shadowfax':
+        m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
+        if m: awb = m.group(1)
+    elif courier == 'Delhivery':
+        for m in re.finditer(r'\b(\d{16})\b', full_text):
+            awb = m.group(1); break
+        if not awb:
+            for m in re.finditer(r'\b(\d{14,15})\b', full_text):
+                awb = m.group(1); break
+    elif courier == 'Ekart':
+        m = re.search(r'AWB\s+No\.\s+(FM[A-Z0-9]+)', full_text, re.I)
+        if m: awb = m.group(1)
+        else:
+            m = re.search(r'\b(FM(?:PC|PP)[A-Z0-9]{6,})\b', full_text, re.I)
+            if m: awb = m.group(1)
+        if not awb:
+            for line in lines:
+                if re.match(r'^FM(?:PC|PP)\d+$', line.strip()):
+                    awb = line.strip(); break
+    elif courier in ('Valmo','ValmoPlus'):
+        m = re.search(r'\b(VL\d{9,})\b', full_text, re.I)
+        if m: awb = m.group(1)
+        else:
+            for m in re.finditer(r'\b(\d{14,18})\b', full_text):
+                awb = m.group(1); break
+    else:
+        for m in re.finditer(r'\b(\d{14,16})\b', full_text):
+            awb = m.group(1); break
+    if not awb: return None
+    data['awb'] = awb
+
+    # ORDER ID
+    if data['platform'] == 'Flipkart':
+        m = re.search(r'\b(OD\d{16,})\b', full_text, re.I)
+        if m: data['order_id'] = m.group(1)
+    else:
+        m = re.search(r'\b(\d{18,20}(?:_\d+)?)\b', full_text)
+        if m and m.group(1) != awb: data['order_id'] = m.group(1)
+        else:
+            m2 = re.search(r'Purchase Order No[.\s]*\n?(\d+)', full_text, re.I)
+            if m2: data['order_id'] = m2.group(1)
+
+    # INVOICE & DATE
+    inv_m = re.search(r'Invoice No[.\s:]*([A-Z0-9\-/]+)', full_text, re.I)
+    if inv_m: data['invoice_no'] = inv_m.group(1).strip()
+    date_m = re.search(r'(\d{2}[/-]\d{2}[/-]\d{4}|\d{4}-\d{2}-\d{2})', full_text)
+    if date_m: data['order_date'] = date_m.group(1)
+
+    # AMOUNT
+    amount = ''
+    for pat in [
+        r'Grand\s+Total[\s:Rs.]*(\d+\.?\d*)',
+        r'Total\s+Amount[\s:Rs.]*(\d+\.?\d*)',
+        r'COD\s+Amount[\s:Rs.]*(\d+\.?\d*)',
+        r'Total\s+Rs\.?\s*(\d+\.?\d*)',
+        r'Rs\.?\s*(\d{2,5}\.?\d{0,2})\b',
+    ]:
+        m = re.search(pat, full_text, re.I)
+        if m:
+            try:
+                val = float(m.group(1))
+                if 50 <= val <= 9999: amount = str(val); break
+            except: pass
+    data['amount'] = amount
+    data['payment'] = 'Prepaid' if re.search(r'prepaid', full_text, re.I) else 'COD'
+
+    # SKU
+    sku = ''
+    if data['platform'] == 'Flipkart':
+        m = re.search(r'\d\s*[|]\s*([A-Z0-9][A-Z0-9+/\-]{3,})\s*[|]', full_text, re.MULTILINE)
+        if m: sku = m.group(1).strip()
+        if not sku:
+            m = re.search(r'\b(\d{1,2}PCS[+/A-Z0-9\-]+)\b', full_text)
+            if m: sku = m.group(1)
+    else:
+        sku_started = False
+        sku_parts = []
+        for i, line in enumerate(lines):
+            if re.search(r'SKU\s+Size|^SKU$', line, re.I):
+                sku_started = True; continue
+            if sku_started:
+                if not line: break
+                if re.match(r'Free Size', line, re.I): break
+                if not sku_parts:
+                    sku_line = re.split(r'\s+Free|\s+\d+$', line)[0].strip()
+                    if sku_line and re.search(r'[A-Z0-9]', sku_line): sku_parts.append(sku_line)
+                else:
+                    if '+' in line or '/' in line: sku_parts.append(line)
+                    else: break
+        if sku_parts: sku = '+'.join(sku_parts)
+        if not sku:
+            m = re.search(r'\b((?:NEW|MS|DTC|LS)?(?:\d+PCS|\d+PC)[A-Z0-9+/\-]+)\b', full_text)
+            if m: sku = m.group(1)
+    data['sku'] = sku
+
+    # QTY
+    qty_m = re.search(r'Free Size\s+(\d+)', full_text)
+    if qty_m: data['qty'] = qty_m.group(1)
+    else:
+        qty_m2 = re.search(r'TOTAL QTY[:\s]+(\d+)', full_text, re.I)
+        if qty_m2: data['qty'] = qty_m2.group(1)
+
+    # CUSTOMER & ADDRESS
+    customer = ''
+    address_parts = []
+    if data['platform'] == 'Flipkart':
+        m = re.search(r'Name:\s*([^\n,]+)', full_text, re.I)
+        if m: customer = m.group(1).strip().rstrip(',')
+        addr_start = full_text.find('Shipping/Customer address:')
+        if addr_start >= 0:
+            addr_block = full_text[addr_start:]
+            addr_lines = [l.strip() for l in addr_block.split('\n') if l.strip()]
+            skip = ['hbd','cpd','sold by','gstin','sku id','not for resale',
+                    'use transparent','shipping/customer','name:','e-kart','flipkart']
+            collecting = False
+            for al in addr_lines:
+                al_low = al.lower()
+                if 'name:' in al_low: collecting = True; continue
+                if not collecting: continue
+                if any(s in al_low for s in skip): continue
+                if re.match(r'^(HBD|CPD|STD)', al): break
+                address_parts.append(al.rstrip(','))
+                if len(address_parts) >= 3: break
+    else:
+        for i, line in enumerate(lines):
+            if re.search(r'customer\s+address|ship\s+to|deliver\s+to', line, re.I):
+                for j in range(i+1, min(i+8, len(lines))):
+                    candidate = lines[j].strip()
+                    if not candidate: continue
+                    skip_words = ['shadowfax','delhivery','ekart','cod','pickup','valmo',
+                                  'prepaid','meesho','flipkart','amazon','return','undelivered']
+                    if any(w in candidate.lower() for w in skip_words): continue
+                    if re.match(r'^\d{6}$', candidate): continue
+                    if not customer: customer = candidate
+                    else:
+                        address_parts.append(candidate)
+                        if len(address_parts) >= 3: break
+                break
+    data['customer'] = customer
+    data['address'] = ', '.join(address_parts[:3])
+
+    # STATE & PIN
+    state_m = re.search(r',\s*([A-Za-z\s&]+),\s*(\d{6})', full_text)
+    if state_m: data['state'] = state_m.group(1).strip(); data['pin'] = state_m.group(2).strip()
+    else:
+        pin_m = re.search(r'\b(\d{6})\b', full_text)
+        if pin_m: data['pin'] = pin_m.group(1)
+
+    # PRODUCT IMAGE & COST
+    if data['sku']:
+        try:
+            conn = get_db()
+            prod = conn.execute("SELECT image_url, cost FROM products WHERE sku=? LIMIT 1",(data['sku'],)).fetchone()
+            if prod: data['product_image'] = prod['image_url'] or ''; data['cost'] = str(prod['cost'] or '')
+            conn.close()
+        except: pass
+    return data
+
+
+def parse_pdf(pdf_path):
+    results = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            total_pages = len(pdf.pages)
+            i = 0
+            while i < total_pages:
+                try:
+                    text = pdf.pages[i].extract_text() or ''
+                    parsed = parse_page_text(text)
+                    if parsed:
+                        results.append(parsed)
+                    elif i+1 < total_pages:
+                        text2 = text + '\n' + (pdf.pages[i+1].extract_text() or '')
+                        parsed2 = parse_page_text(text2)
+                        if parsed2:
+                            results.append(parsed2)
+                            i += 1
+                except Exception:
+                    pass
+                i += 1
+    except Exception:
+        pass
+    return results
+
+# ============ AUTH ============
+@app.route('/login', methods=['GET','POST'])
+def login():
+    if request.method == 'POST':
+        u = request.form.get('username','').strip()
+        p = request.form.get('password','').strip()
+        user = USERS.get(u)
+        if user and user['password'] == p:
+            session['user'] = u
+            session['role'] = user['role']
+            session['name'] = user['name']
+            log_action(u, 'LOGIN')
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Invalid credentials')
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    log_action(session.get('user','?'), 'LOGOUT')
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/')
+@login_required
+def index():
+    return render_template('index.html', user=session.get('name'), role=session.get('role'))
+
+# ============ SUMMARY ============
+@app.route('/api/summary')
+@login_required
+def get_summary():
+    conn = get_db()
+    total = conn.execute("SELECT COUNT(*) FROM orders").fetchone()[0]
+    pending = conn.execute("SELECT COUNT(*) FROM orders WHERE status='Pending'").fetchone()[0]
+    delivered = conn.execute("SELECT COUNT(*) FROM orders WHERE status='Delivered'").fetchone()[0]
+    rto = conn.execute("SELECT COUNT(*) FROM orders WHERE status IN ('RTO','RTO Initiated','RTO Received')").fetchone()[0]
+    shipped = conn.execute("SELECT COUNT(*) FROM orders WHERE status='Shipped'").fetchone()[0]
+    platforms = {r[0]:r[1] for r in conn.execute("SELECT platform,COUNT(*) FROM orders WHERE platform!='' GROUP BY platform").fetchall()}
+    couriers = {r[0]:r[1] for r in conn.execute("SELECT courier,COUNT(*) FROM orders WHERE courier!='' GROUP BY courier").fetchall()}
+    statuses = {r[0]:r[1] for r in conn.execute("SELECT status,COUNT(*) FROM orders GROUP BY status ORDER BY COUNT(*) DESC").fetchall()}
+    today = datetime.now().strftime('%Y-%m-%d')
+    today_count = conn.execute("SELECT COUNT(*) FROM orders WHERE created_at LIKE ?", (today+'%',)).fetchone()[0]
+    conn.close()
+    return jsonify({'total':total,'pending':pending,'delivered':delivered,'rto':rto,
+                    'shipped':shipped,'today':today_count,
+                    'platforms':platforms,'couriers':couriers,'status_counts':statuses})
+
+# ============ ORDERS — with date filter ============
+@app.route('/api/orders')
+@login_required
+def get_orders():
+    page = int(request.args.get('page',1))
+    per_page = int(request.args.get('per_page',100))
+    search = request.args.get('search','').strip()
+    status = request.args.get('status','').strip()
+    platform = request.args.get('platform','').strip()
+    courier = request.args.get('courier','').strip()
+    date_from = request.args.get('date_from','').strip()   # YYYY-MM-DD
+    date_to = request.args.get('date_to','').strip()       # YYYY-MM-DD
+    batch = request.args.get('batch','').strip()
+    offset = (page-1)*per_page
+    where, params = [], []
+    if search:
+        where.append("(awb LIKE ? OR order_id LIKE ? OR customer LIKE ? OR sku LIKE ?)")
+        s = f'%{search}%'
+        params += [s,s,s,s]
+    if status: where.append("status=?"); params.append(status)
+    if platform: where.append("platform=?"); params.append(platform)
+    if courier: where.append("courier=?"); params.append(courier)
+    if batch: where.append("batch=?"); params.append(batch)
+    if date_from: where.append("batch >= ?"); params.append(date_from)
+    if date_to: where.append("batch <= ?"); params.append(date_to)
+    wc = "WHERE "+" AND ".join(where) if where else ""
+    conn = get_db()
+    total = conn.execute(f"SELECT COUNT(*) FROM orders {wc}", params).fetchone()[0]
+    rows = conn.execute(f"SELECT * FROM orders {wc} ORDER BY id DESC LIMIT ? OFFSET ?", params+[per_page,offset]).fetchall()
+    conn.close()
+    return jsonify({'orders':[dict(r) for r in rows],'total':total,'page':page,'per_page':per_page})
+
+@app.route('/api/orders/update_status', methods=['POST'])
+@login_required
+def update_status():
+    data = request.json
+    awb = data.get('awb','').strip()
+    status = data.get('status','').strip()
+    conn = get_db()
+    conn.execute("UPDATE orders SET status=?,updated_at=datetime('now','localtime') WHERE awb=?", (status,awb))
+    conn.commit()
+    conn.close()
+    log_action(session.get('user','?'), 'STATUS_UPDATE', f"AWB:{awb}→{status}")
+    return jsonify({'success':True})
+
+@app.route('/api/orders/bulk_status', methods=['POST'])
+@login_required
+def bulk_status():
+    data = request.json
+    awbs = data.get('awbs',[])
+    status = data.get('status','').strip()
+    conn = get_db()
+    for awb in awbs:
+        conn.execute("UPDATE orders SET status=?,updated_at=datetime('now','localtime') WHERE awb=?", (status,awb))
+    conn.commit()
+    conn.close()
+    return jsonify({'success':True,'updated':len(awbs)})
+
+# ============ SCANNER ============
+@app.route('/api/scan/zip', methods=['POST'])
+@login_required
+def scan_zip():
+    if 'file' not in request.files:
+        return jsonify({'error':'No file uploaded'}), 400
+    f = request.files['file']
+    batch_date = request.form.get('batch_date', datetime.now().strftime('%Y-%m-%d'))
+    tmp_dir = os.path.join(UPLOAD_FOLDER, 'tmp_'+datetime.now().strftime('%Y%m%d%H%M%S'))
+    os.makedirs(tmp_dir, exist_ok=True)
+    try:
+        fname = secure_filename(f.filename)
+        fpath = os.path.join(tmp_dir, fname)
+        f.save(fpath)
+        if fname.lower().endswith('.zip'):
+            with zipfile.ZipFile(fpath,'r') as z:
+                z.extractall(tmp_dir)
+            pdf_files = []
+            for root,dirs,files in os.walk(tmp_dir):
+                for fn in sorted(files):
+                    if fn.lower().endswith('.pdf'):
+                        pdf_files.append(os.path.join(root,fn))
+        elif fname.lower().endswith('.pdf'):
+            pdf_files = [fpath]
+        else:
+            return jsonify({'error':'Upload ZIP or PDF only'}), 400
+
+        conn = get_db()
+        existing_awbs = {r[0] for r in conn.execute("SELECT awb FROM orders").fetchall()}
+        existing_order_ids = {r[0] for r in conn.execute("SELECT order_id FROM orders WHERE order_id!=''").fetchall()}
+        conn.close()
+
+        all_results = []
+        seen_in_batch = set()  # dedupe within same ZIP
+        for pdf_path in pdf_files:
+            parsed_list = parse_pdf(pdf_path)
+            for parsed in parsed_list:
+                parsed['batch'] = batch_date
+                parsed['status'] = 'Pending'
+                parsed['scanned_by'] = session.get('name','')
+                parsed['filename'] = os.path.basename(pdf_path)
+                awb = parsed.get('awb','')
+                oid = parsed.get('order_id','')
+                # Mark duplicate: AWB already in DB OR order_id already in DB OR duplicate in same ZIP
+                is_dup = (awb in existing_awbs) or (awb in seen_in_batch)
+                parsed['is_duplicate'] = is_dup
+                if not is_dup:
+                    seen_in_batch.add(awb)
+                all_results.append(parsed)
+
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        log_action(session.get('user','?'), 'SCAN_ZIP', f"Batch:{batch_date} Orders:{len(all_results)}")
+        return jsonify({'success':True,'total':len(all_results),'results':all_results})
+    except Exception as e:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        return jsonify({'error':str(e)}), 500
+
+@app.route('/api/scan/confirm', methods=['POST'])
+@login_required
+def scan_confirm():
+    data = request.json
+    orders = data.get('orders',[])
+    conn = get_db()
+    existing = {r[0] for r in conn.execute("SELECT awb FROM orders").fetchall()}
+    existing_oids = {r[0] for r in conn.execute("SELECT order_id FROM orders WHERE order_id!=''").fetchall()}
+    added = skipped = 0
+    for o in orders:
+        awb = o.get('awb','').strip()
+        oid = o.get('order_id','').strip()
+        # Skip if AWB or Order ID already exists
+        if not awb or awb in existing or (oid and oid in existing_oids):
+            skipped += 1
+            continue
+        try:
+            conn.execute('''INSERT INTO orders
+                (order_date,customer,address,state,pin,sku,qty,invoice_no,awb,order_id,
+                 courier,amount,payment,batch,entity,platform,status,cost,product_image,scanned_by)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                (o.get('order_date',''),o.get('customer',''),o.get('address',''),
+                 o.get('state',''),o.get('pin',''),o.get('sku',''),o.get('qty','1'),
+                 o.get('invoice_no',''),awb,oid,
+                 o.get('courier',''),float(o.get('amount',0) or 0),
+                 o.get('payment','COD'),o.get('batch',''),'SAI Enterprises',
+                 o.get('platform',''),'Pending',
+                 float(o.get('cost',0) or 0),o.get('product_image',''),
+                 o.get('scanned_by','')))
+            existing.add(awb)
+            if oid: existing_oids.add(oid)
+            added += 1
+        except Exception as e:
+            skipped += 1
+    conn.commit()
+    conn.close()
+    log_action(session.get('user','?'), 'SCAN_CONFIRM', f"Added:{added} Skipped:{skipped}")
+    return jsonify({'success':True,'added':added,'skipped':skipped})
+
+@app.route('/api/scan/return', methods=['POST'])
+@login_required
+def scan_return():
+    awb = request.form.get('awb','').strip()
+    condition = request.form.get('condition','Good')
+    remark = request.form.get('remark','')
+    photos = request.files.getlist('photos')
+
+    if not awb:
+        return jsonify({'error':'AWB required'}), 400
+
+    conn = get_db()
+
+    # 1. DUPLICATE CHECK
+    already = conn.execute(
+        "SELECT id, condition FROM returns WHERE awb=? ORDER BY id DESC LIMIT 1", (awb,)
+    ).fetchone()
+    if already:
+        conn.close()
+        return jsonify({
+            'error': 'DUPLICATE',
+            'message': f'AWB {awb} already scanned as return!',
+            'prev_id': already['id'],
+            'prev_condition': already['condition']
+        }), 409
+
+    # 2. ORDER LOOKUP + QTY CHECK
+    order = conn.execute(
+        "SELECT id, qty, sku, customer, amount, status FROM orders WHERE awb=?", (awb,)
+    ).fetchone()
+
+    qty_val = 1
+    qty_alert = False
+    if order:
+        try:
+            qty_val = int(order['qty'] or 1)
+        except:
+            qty_val = 1
+        if qty_val > 1:
+            qty_alert = True
+
+    # 3. SAVE PHOTOS
+    photo_paths = []
+    for photo in photos:
+        if photo and photo.filename:
+            fn = secure_filename(
+                f"ret_{awb}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}"
+            )
+            photo.save(os.path.join(IMAGES_FOLDER, fn))
+            photo_paths.append(f"/static/images/{fn}")
+
+    # 4. UPDATE ORDER STATUS
+    updated = False
+    if order:
+        conn.execute(
+            "UPDATE orders SET status='RTO Received', return_remark=?, photo=?, "
+            "updated_at=datetime('now','localtime') WHERE awb=?",
+            (f"{condition}|{remark}", ','.join(photo_paths), awb)
+        )
+        updated = True
+
+    # 5. INSERT INTO RETURNS
+    conn.execute(
+        "INSERT INTO returns (awb, condition, remark, photos, scanned_by) VALUES (?,?,?,?,?)",
+        (awb, condition, remark, json.dumps(photo_paths), session.get('name',''))
+    )
+    conn.commit()
+    conn.close()
+
+    log_action(session.get('user','?'), 'RETURN_SCAN', f"AWB:{awb} {condition} QTY:{qty_val}")
+
+    return jsonify({
+        'success': True,
+        'updated': updated,
+        'photos': photo_paths,
+        'qty_alert': qty_alert,
+        'qty': qty_val,
+        'order': dict(order) if order else None,
+        'message': f'Return saved! AWB: {awb}'
+    })
+# ============ FRAUD ============
+@app.route('/api/fraud')
+@admin_required
+def get_fraud():
+    conn = get_db()
+    rows = conn.execute('''SELECT pin,COUNT(*) as rto_count,
+                           GROUP_CONCAT(DISTINCT customer) as customers
+                           FROM orders WHERE status IN ('RTO','RTO Initiated','RTO Received')
+                           AND pin!='' GROUP BY pin HAVING rto_count>2
+                           ORDER BY rto_count DESC LIMIT 100''').fetchall()
+    conn.close()
+    return jsonify({'fraud':[dict(r) for r in rows]})
+
+# ============ BATCHES ============
+@app.route('/api/batches')
+@login_required
+def get_batches():
+    conn = get_db()
+    rows = conn.execute('''SELECT batch,COUNT(*) as total,
+                           COUNT(CASE WHEN status='Delivered' THEN 1 END) as delivered,
+                           COUNT(CASE WHEN status IN ('RTO','RTO Initiated','RTO Received') THEN 1 END) as rto,
+                           COUNT(CASE WHEN status='Pending' THEN 1 END) as pending
+                           FROM orders WHERE batch!='' GROUP BY batch ORDER BY batch DESC''').fetchall()
+    conn.close()
+    return jsonify({'batches':[dict(r) for r in rows]})
+
+# ============ STAFF LOG ============
+@app.route('/api/staff_log')
+@admin_required
+def get_staff_log():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM staff_log ORDER BY created_at DESC LIMIT 200").fetchall()
+    conn.close()
+    return jsonify({'logs':[dict(r) for r in rows]})
+
+# ============ EXPORT ============
+@app.route('/api/export/excel')
+@admin_required
+def export_excel():
+    conn = get_db()
+    df = pd.read_sql_query("SELECT * FROM orders ORDER BY id DESC", conn)
+    conn.close()
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='All Orders')
+    output.seek(0)
+    return send_file(output, as_attachment=True,
+                     download_name=f'SAI_Export_{datetime.now().strftime("%d%b%Y")}.xlsx',
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+@app.route('/api/export/csv')
+@login_required
+def export_csv():
+    status = request.args.get('status','')
+    conn = get_db()
+    if status:
+        df = pd.read_sql_query("SELECT * FROM orders WHERE status=? ORDER BY id DESC", conn, params=[status])
+    else:
+        df = pd.read_sql_query("SELECT * FROM orders ORDER BY id DESC LIMIT 10000", conn)
+    conn.close()
+    output = io.StringIO()
+    df.to_csv(output, index=False)
+    output.seek(0)
+    return Response(output.getvalue(), mimetype='text/csv',
+                    headers={'Content-Disposition': f'attachment; filename=orders_{datetime.now().strftime("%d%b%Y")}.csv'})
+
+# ============ PRODUCT LOOKUP ============
+@app.route('/api/product/lookup')
+@login_required
+def product_lookup():
+    sku = request.args.get('sku','').strip()
+    if not sku:
+        return jsonify({'error':'SKU required'}), 400
+    conn = get_db()
+    prod = conn.execute(
+        "SELECT sku,store_name,platform,cost,selling_price,image_url,status,rto_per,ret_per FROM products WHERE sku=? LIMIT 1",
+        (sku,)
+    ).fetchone()
+    if not prod:
+        prod = conn.execute(
+            "SELECT sku,store_name,platform,cost,selling_price,image_url,status,rto_per,ret_per FROM products WHERE sku LIKE ? LIMIT 1",
+            (f'%{sku[:10]}%',)
+        ).fetchone()
+    conn.close()
+    if prod:
+        return jsonify({'found':True,'product':dict(prod)})
+    return jsonify({'found':False,'message':'SKU not found'})
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
