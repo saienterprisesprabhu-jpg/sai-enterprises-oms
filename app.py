@@ -4,7 +4,7 @@ import sqlite3, os, zipfile, shutil, re, json, io
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import pdfplumber
-import pandas as pd<!DOCTYPE html>
+import pandas as pd
 <html lang="en">
 <head>
 <meta charset="UTF-8">
