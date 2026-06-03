@@ -785,29 +785,95 @@ function previewPhotos(input) {
   }
 }
 
-async function submitReturn() {
-  const awb = document.getElementById('return-awb').value.trim();
-  if(!awb) { toast('Please enter AWB number', 'error'); return; }
-  const formData = new FormData();
-  formData.append('awb', awb);
-  formData.append('condition', document.getElementById('return-condition').value);
-  formData.append('remark', document.getElementById('return-remark').value);
-  const photos = document.getElementById('return-photos').files;
-  for(const p of photos) formData.append('photos', p);
+.async function submitReturn() {
+  const awbInput  = document.getElementById('return-awb');
+  const condSel   = document.getElementById('return-condition');
+  const remInput  = document.getElementById('return-remark');
+  const photosEl  = document.getElementById('return-photos');
+  const btn       = document.getElementById('btnSubmitReturn');
 
-  const btn = event.currentTarget;
-  btn.disabled=true; btn.textContent='⏳ Submitting...';
-  const r = await fetch('/api/scan/return', {method:'POST', body:formData});
-  const data = await r.json();
-  btn.disabled=false; btn.textContent='✅ Submit Return Scan';
-  if(data.success) {
-    toast(data.updated ? '✅ Return recorded for AWB: '+awb : '⚠️ AWB not found in master, but photos saved');
-    document.getElementById('return-awb').value='';
-    document.getElementById('return-remark').value='';
-    document.getElementById('return-photos').value='';
-    document.getElementById('photo-preview').innerHTML='';
-  } else {
-    toast('❌ Error: '+data.error, 'error');
+  const awb       = awbInput ? awbInput.value.trim() : '';
+  const condition = condSel  ? condSel.value  : 'Good';
+  const remark    = remInput ? remInput.value : '';
+  const photos    = photosEl ? photosEl.files  : [];
+
+  if (!awb) {
+    showReturnInlineAlert('⚠️ AWB scan karo ya type karo pehle!', 'warning');
+    ScanSound.notFound();
+    awbInput && awbInput.focus();
+    return;
+  }
+
+  const needsPhoto = ['Damaged','Wrong Item','Tampered','Empty','Missing Item'].includes(condition);
+  if (needsPhoto && photos.length === 0) {
+    showReturnInlineAlert(`📸 <strong>${condition}</strong> ke liye photo mandatory hai!<br>Photo lo phir submit karo.`, 'danger', 0);
+    ScanSound.qtyAlert();
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('awb', awb);
+  fd.append('condition', condition);
+  fd.append('remark', remark);
+  for (const p of photos) fd.append('photos', p);
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Saving...'; }
+
+  try {
+    const res  = await fetch('/api/scan/return', { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (res.status === 409 || data.error === 'DUPLICATE') {
+      ScanSound.duplicate();
+      showReturnInlineAlert(`🔴 <strong>DUPLICATE!</strong><br>AWB <code style="background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:4px;">${awb}</code> pehle se scan ho chuka hai!`, 'danger', 7000);
+      if (awbInput) {
+        awbInput.style.borderColor = 'var(--danger)';
+        awbInput.select();
+        setTimeout(() => { awbInput.style.borderColor = ''; }, 3000);
+      }
+      return;
+    }
+
+    if (!data.success) {
+      ScanSound.notFound();
+      showReturnInlineAlert('❌ Error: ' + (data.message || data.error || 'Unknown error'), 'danger');
+      return;
+    }
+
+    if (data.qty_alert) {
+      ScanSound.qtyAlert();
+      setTimeout(() => ScanSound.success(), 700);
+      const ord = data.order || {};
+      showReturnInlineAlert(
+        `⚠️ <strong>QTY ALERT — ${data.qty} ITEMS!</strong><br>` +
+        `AWB: <strong>${awb}</strong><br>` +
+        `Customer: <strong>${ord.customer || '—'}</strong><br>` +
+        `SKU: <strong>${ord.sku || '—'}</strong><br>` +
+        `Sab ${data.qty} items check karo packet mein!`,
+        'warning', 12000
+      );
+    } else {
+      ScanSound.success();
+      const ord = data.order || {};
+      if (!data.updated) {
+        showReturnInlineAlert(`🟡 Saved (AWB DB mein nahi mila): <strong>${awb}</strong><br>Photos saved. Manual check karo.`, 'warning');
+      } else {
+        showReturnInlineAlert(`✅ <strong>Return Saved!</strong><br>AWB: <strong>${awb}</strong> | ${condition}<br>Customer: <strong>${ord.customer || '—'}</strong> | ₹${ord.amount || '—'}`, 'success');
+      }
+    }
+
+    _incrReturnCounter();
+    if (awbInput)  { awbInput.value = ''; awbInput.style.borderColor = 'var(--success)'; setTimeout(()=>awbInput.style.borderColor='',1500); awbInput.focus(); }
+    if (remInput)  remInput.value  = '';
+    if (photosEl)  photosEl.value  = '';
+    const preview = document.getElementById('photo-preview');
+    if (preview) preview.innerHTML = '';
+
+  } catch (err) {
+    ScanSound.notFound();
+    showReturnInlineAlert('🌐 Network error: ' + err.message, 'danger');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Submit Return Scan'; }
   }
 }
 
