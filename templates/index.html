@@ -215,24 +215,30 @@ textarea{background:rgba(255,255,255,0.05);border:1px solid var(--border);border
           <div id="scan-status" style="font-size:13px;color:var(--muted);margin-top:8px;"></div>
         </div>
 
-        <!-- Return / RTO Scanner -->
+       .<!-- Return / RTO Scanner -->
         <div class="scanner-card">
-          <h3>🔄 Return / RTO Scanner</h3>
+          <h3>🔄 Return / RTO Scanner 
+            <span style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:400;">
+              Aaj: <span id="returnCountBadge" style="background:rgba(233,69,96,0.2);color:var(--accent);padding:2px 8px;border-radius:12px;font-weight:700;">0</span> returns
+            </span>
+          </h3>
           <div class="return-form">
             <div class="form-group">
               <label>AWB Number *</label>
-              <input type="text" id="return-awb" placeholder="Enter AWB / Tracking No">
+              <input type="text" id="return-awb" placeholder="Scan ya type karo AWB..." 
+                autocomplete="off" autocorrect="off" spellcheck="false"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();submitReturn();}">
             </div>
             <div class="form-row">
               <div class="form-group">
                 <label>Condition</label>
                 <select id="return-condition">
-                  <option value="Good">Good</option>
-                  <option value="Damaged">Damaged</option>
-                  <option value="Tampered">Tampered / Opened</option>
-                  <option value="Empty">Empty Box</option>
-                  <option value="Wrong Item">Wrong Item</option>
-                  <option value="Missing Item">Missing Item</option>
+                  <option value="Good">✅ Good</option>
+                  <option value="Damaged">💥 Damaged</option>
+                  <option value="Tampered">🔓 Tampered / Opened</option>
+                  <option value="Empty">📭 Empty Box</option>
+                  <option value="Wrong Item">❌ Wrong Item</option>
+                  <option value="Missing Item">⚠️ Missing Item</option>
                 </select>
               </div>
               <div class="form-group">
@@ -241,14 +247,23 @@ textarea{background:rgba(255,255,255,0.05);border:1px solid var(--border);border
               </div>
             </div>
             <div class="form-group">
-              <label>Upload Photos (Packet, Label, Damage proof)</label>
+              <label>Upload Photos 
+                <span id="photo-mandatory-hint" style="color:var(--danger);font-size:11px;display:none;">* Damaged/Wrong ke liye mandatory</span>
+              </label>
               <div class="photo-upload-zone" onclick="document.getElementById('return-photos').click()">
                 <div style="font-size:30px">📸</div>
                 <p style="font-size:13px;color:var(--muted);margin-top:4px;">Camera / Gallery / Multiple photos</p>
-                <input type="file" id="return-photos" accept="image/*" multiple capture="environment" style="display:none" onchange="previewPhotos(this)">
+                <input type="file" id="return-photos" accept="image/*" multiple capture="environment" 
+                  style="display:none" onchange="previewPhotos(this)">
               </div>
               <div class="photo-preview" id="photo-preview"></div>
             </div>
+            <div id="return-inline-alert" style="display:none;padding:12px 16px;border-radius:10px;font-size:13px;font-weight:600;line-height:1.5;"></div>
+            <button class="btn btn-primary" id="btnSubmitReturn" onclick="submitReturn()" style="width:100%;font-size:15px;padding:12px;">
+              ✅ Submit Return Scan
+            </button>
+          </div>
+        </div>
             <button class="btn btn-primary" onclick="submitReturn()" style="width:100%">✅ Submit Return Scan</button>
           </div>
         </div>
