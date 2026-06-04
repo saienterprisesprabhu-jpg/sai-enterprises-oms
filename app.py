@@ -125,11 +125,7 @@ def parse_page_text(text):
     elif re.search(r'amazon', full_text, re.I): data['platform'] = 'Amazon'
 
     # AWB
-    awb = ''
-    if courier == 'Shadowfax':
-        m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
-        if m: awb = m.group(1)
-    elif courier == 'Delhivery':
+S    elif courier == 'Delhivery':
         for m in re.finditer(r'\b(\d{16})\b', full_text):
             awb = m.group(1); break
         if not awb:
@@ -300,7 +296,7 @@ def parse_pdf(pdf_path):
                     elif i+1 < total_pages:
                         text2 = text + '\n' + (pdf.pages[i+1].extract_text() or '')
                         parsed2 = parse_page_text(text2)
-                        if parsed2:
+e                        if parsed2:
                             results.append(parsed2)
                             i += 1
                 except Exception:
