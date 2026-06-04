@@ -300,7 +300,7 @@ def parse_pdf(pdf_path):
                     elif i+1 < total_pages:
                         text2 = text + '\n' + (pdf.pages[i+1].extract_text() or '')
                         parsed2 = parse_page_text(text2)
-e                        if parsed2:
+                        if parsed2:
                             results.append(parsed2)
                             i += 1
                 except Exception:
