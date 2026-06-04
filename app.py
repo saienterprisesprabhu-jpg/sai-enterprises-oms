@@ -386,9 +386,17 @@ def get_orders():
     conn = get_db()
     total = conn.execute(f"SELECT COUNT(*) FROM orders {wc}", params).fetchone()[0]
     rows = conn.execute(f"SELECT * FROM orders {wc} ORDER BY id DESC LIMIT ? OFFSET ?", params+[per_page,offset]).fetchall()
-    conn.close()
-    return jsonify({'orders':[dict(r) for r in rows],'total':total,'page':page,'per_page':per_page})
-
+        orders_list = []
+        for r in rows:
+            d = dict(r)
+            if d.get('sku'):
+                img = conn.execute("SELECT image_url FROM products WHERE sku=? LIMIT 1", (d['sku'],)).fetchone()
+                d['product_image'] = img['image_url'] if img and img['image_url'] else ''
+            else:
+                d['product_image'] = ''
+            orders_list.append(d)
+        conn.close()
+        return jsonify({'orders':orders_list,'total':total,'page':page,'per_page':per_page})
 @app.route('/api/orders/update_status', methods=['POST'])
 @login_required
 def update_status():
