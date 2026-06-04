@@ -124,8 +124,12 @@ def parse_page_text(text):
     elif re.search(r'meesho|sold by', full_text, re.I): data['platform'] = 'Meesho'
     elif re.search(r'amazon', full_text, re.I): data['platform'] = 'Amazon'
 
-    # AWB
-S    elif courier == 'Delhivery':
+       # AWB
+    awb = ''
+    if courier == 'Shadowfax':
+        m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
+        if m: awb = m.group(1)
+       elif courier == 'Delhivery':
         for m in re.finditer(r'\b(\d{16})\b', full_text):
             awb = m.group(1); break
         if not awb:
