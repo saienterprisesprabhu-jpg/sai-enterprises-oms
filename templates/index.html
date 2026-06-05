@@ -635,7 +635,7 @@ async function loadOrders(page=1) {
     const stClass = st==='Delivered'?'delivered':st.includes('RTO')?'rto':st==='Pending'?'pending':st==='Shipped'||st==='In Transit'?'shipped':'lost';
     const statusOpts = ['Pending','Picked Up','In Transit','Delivered','RTO Initiated','RTO Received','Lost','Damaged','Fake Delivery','Cancelled'];
     const detail = encodeURIComponent(JSON.stringify(o));
-    return `<tr onclick="showOrderDetail(decodeURIComponent('${detail}'))">
+    return `<tr onclick="showOrderDetail(JSON.parse(decodeURIComponent('${detail}')))">
       <td>${o.id||''}</td>
       <td style="white-space:nowrap;font-size:11px">${o.order_date||''}</td>
       <td><span style="font-size:11px;font-family:monospace;color:var(--accent2)">${o.awb||''}</span></td>
@@ -652,7 +652,7 @@ async function loadOrders(page=1) {
         </select>
       </td>
        <td onclick="event.stopPropagation()">
-              <button class="btn btn-secondary btn-sm" onclick="showOrderDetail(decodeURIComponent('${detail}'))">👁</button>
+              <button class="btn btn-secondary btn-sm" onclick="showOrderDetail(JSON.parse(decodeURIComponent('${detail}')))">👁</button>
       </td>
     </tr>`;
   }).join('');

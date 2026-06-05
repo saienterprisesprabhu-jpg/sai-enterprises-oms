@@ -58,9 +58,9 @@ def init_db():
 init_db()
 
 USERS = {
-    'admin':  {'password': 'sai@admin2026', 'role': 'admin',  'name': 'Admin (Lalit)'},
-    'staff1': {'password': 'staff@123',     'role': 'staff',  'name': 'Staff 1'},
-    'staff2': {'password': 'staff@456',     'role': 'staff',  'name': 'Staff 2'},
+    'admin':    {'password': 'sai@admin2026', 'role': 'admin', 'name': 'Admin (Lalit)'},
+    'sanjeev':  {'password': '2222',          'role': 'staff', 'name': 'Sanjeev'},
+    'rajkumar': {'password': '1111',          'role': 'staff', 'name': 'Raj Kumar'},
 }
 
 def get_db():
