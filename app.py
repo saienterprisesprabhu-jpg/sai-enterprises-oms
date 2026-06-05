@@ -599,6 +599,49 @@ def scan_return():
         'order': dict(order) if order else None,
         'message': f'Return saved! AWB: {awb}'
     })
+# ============ RETURNS API ============
+@app.route('/api/returns')
+@login_required
+def get_returns():
+    conn = get_db()
+    rows = conn.execute('''SELECT r.id, r.awb, r.condition, r.remark, r.scanned_by, r.created_at,
+                           o.customer, o.sku, o.amount, o.courier, o.platform, o.batch
+                           FROM returns r LEFT JOIN orders o ON r.awb=o.awb
+                           ORDER BY r.created_at DESC LIMIT 500''').fetchall()
+    conn.close()
+    return jsonify({'returns':[dict(r) for r in rows]})
+
+# ============ CLAIMS API ============
+@app.route('/api/claims')
+@login_required
+def get_claims():
+    conn = get_db()
+    rows = conn.execute('''SELECT id, awb, customer, sku, amount, courier, platform, batch,
+                           claim_date, claim_recd_date, claim_amt, return_remark, status
+                           FROM orders WHERE claim_date!='' OR claim_amt>0
+                           ORDER BY id DESC LIMIT 500''').fetchall()
+    conn.close()
+    return jsonify({'claims':[dict(r) for r in rows]})
+
+# ============ FINANCE API ============
+@app.route('/api/finance')
+@admin_required
+def get_finance():
+    conn = get_db()
+    rows = conn.execute('''SELECT id, awb, customer, sku, amount, cost, settlement, pnl,
+                           courier, platform, batch, status, fin_note
+                           FROM orders ORDER BY id DESC LIMIT 1000''').fetchall()
+    conn.close()
+    return jsonify({'finance':[dict(r) for r in rows]})
+
+# ============ PRODUCTS API ============
+@app.route('/api/products')
+@login_required
+def get_products():
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM products ORDER BY sku LIMIT 5000").fetchall()
+    conn.close()
+    return jsonify({'products':[dict(r) for r in rows]})
 # ============ FRAUD ============
 @app.route('/api/fraud')
 @admin_required
