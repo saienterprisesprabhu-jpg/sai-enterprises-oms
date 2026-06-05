@@ -6,7 +6,6 @@ from werkzeug.utils import secure_filename
 import pdfplumber
 import pandas as pd
 
-
 app = Flask(__name__)
 app.secret_key = 'sai_enterprises_2026_secret_key_xyz'
 
@@ -58,9 +57,9 @@ def init_db():
 init_db()
 
 USERS = {
-    'admin':    {'password': 'sai@admin2026', 'role': 'admin', 'name': 'Admin (Lalit)'},
-    'sanjeev':  {'password': '2222',          'role': 'staff', 'name': 'Sanjeev'},
-    'rajkumar': {'password': '1111',          'role': 'staff', 'name': 'Raj Kumar'},
+    'admin':  {'password': 'sai@admin2026', 'role': 'admin',  'name': 'Admin (Lalit)'},
+    'staff1': {'password': 'staff@123',     'role': 'staff',  'name': 'Staff 1'},
+    'staff2': {'password': 'staff@456',     'role': 'staff',  'name': 'Staff 2'},
 }
 
 def get_db():
@@ -95,7 +94,13 @@ def log_action(username, action, details=''):
         conn.close()
     except: pass
 
-# ============ FIXED PARSE FUNCTION ============
+def clean_customer_name(name):
+    """Remove 'Name:' prefix from customer name"""
+    if not name: return name
+    name = re.sub(r'^Name:\s*', '', name, flags=re.I).strip()
+    name = name.rstrip(',').strip()
+    return name
+
 def parse_page_text(text):
     data = {
         'awb':'','order_id':'','customer':'','address':'',
@@ -124,7 +129,7 @@ def parse_page_text(text):
     elif re.search(r'meesho|sold by', full_text, re.I): data['platform'] = 'Meesho'
     elif re.search(r'amazon', full_text, re.I): data['platform'] = 'Amazon'
 
-       # AWB
+    # AWB
     awb = ''
     if courier == 'Shadowfax':
         m = re.search(r'(SF[A-Z0-9]{10,})', full_text)
@@ -264,6 +269,9 @@ def parse_page_text(text):
                         address_parts.append(candidate)
                         if len(address_parts) >= 3: break
                 break
+
+    # Clean customer name — remove "Name:" prefix
+    customer = clean_customer_name(customer)
     data['customer'] = customer
     data['address'] = ', '.join(address_parts[:3])
 
@@ -357,7 +365,7 @@ def get_summary():
                     'shipped':shipped,'today':today_count,
                     'platforms':platforms,'couriers':couriers,'status_counts':statuses})
 
-# ============ ORDERS — with date filter ============
+# ============ ORDERS ============
 @app.route('/api/orders')
 @login_required
 def get_orders():
@@ -367,8 +375,8 @@ def get_orders():
     status = request.args.get('status','').strip()
     platform = request.args.get('platform','').strip()
     courier = request.args.get('courier','').strip()
-    date_from = request.args.get('date_from','').strip()   # YYYY-MM-DD
-    date_to = request.args.get('date_to','').strip()       # YYYY-MM-DD
+    date_from = request.args.get('date_from','').strip()
+    date_to = request.args.get('date_to','').strip()
     batch = request.args.get('batch','').strip()
     offset = (page-1)*per_page
     where, params = [], []
@@ -386,17 +394,21 @@ def get_orders():
     conn = get_db()
     total = conn.execute(f"SELECT COUNT(*) FROM orders {wc}", params).fetchone()[0]
     rows = conn.execute(f"SELECT * FROM orders {wc} ORDER BY id DESC LIMIT ? OFFSET ?", params+[per_page,offset]).fetchall()
-        orders_list = []
-        for r in rows:
-            d = dict(r)
-            if d.get('sku'):
-                img = conn.execute("SELECT image_url FROM products WHERE sku=? LIMIT 1", (d['sku'],)).fetchone()
-                d['product_image'] = img['image_url'] if img and img['image_url'] else ''
-            else:
-                d['product_image'] = ''
-            orders_list.append(d)
-        conn.close()
-        return jsonify({'orders':orders_list,'total':total,'page':page,'per_page':per_page})
+    orders_list = []
+    for r in rows:
+        d = dict(r)
+        if d.get('sku'):
+            img = conn.execute("SELECT image_url FROM products WHERE sku=? LIMIT 1", (d['sku'],)).fetchone()
+            d['product_image'] = img['image_url'] if img and img['image_url'] else ''
+        else:
+            d['product_image'] = ''
+        # Clean customer name
+        if d.get('customer'):
+            d['customer'] = clean_customer_name(d['customer'])
+        orders_list.append(d)
+    conn.close()
+    return jsonify({'orders':orders_list,'total':total,'page':page,'per_page':per_page})
+
 @app.route('/api/orders/update_status', methods=['POST'])
 @login_required
 def update_status():
@@ -449,14 +461,11 @@ def scan_zip():
             pdf_files = [fpath]
         else:
             return jsonify({'error':'Upload ZIP or PDF only'}), 400
-
         conn = get_db()
         existing_awbs = {r[0] for r in conn.execute("SELECT awb FROM orders").fetchall()}
-        existing_order_ids = {r[0] for r in conn.execute("SELECT order_id FROM orders WHERE order_id!=''").fetchall()}
         conn.close()
-
         all_results = []
-        seen_in_batch = set()  # dedupe within same ZIP
+        seen_in_batch = set()
         for pdf_path in pdf_files:
             parsed_list = parse_pdf(pdf_path)
             for parsed in parsed_list:
@@ -465,14 +474,11 @@ def scan_zip():
                 parsed['scanned_by'] = session.get('name','')
                 parsed['filename'] = os.path.basename(pdf_path)
                 awb = parsed.get('awb','')
-                oid = parsed.get('order_id','')
-                # Mark duplicate: AWB already in DB OR order_id already in DB OR duplicate in same ZIP
                 is_dup = (awb in existing_awbs) or (awb in seen_in_batch)
                 parsed['is_duplicate'] = is_dup
                 if not is_dup:
                     seen_in_batch.add(awb)
                 all_results.append(parsed)
-
         shutil.rmtree(tmp_dir, ignore_errors=True)
         log_action(session.get('user','?'), 'SCAN_ZIP', f"Batch:{batch_date} Orders:{len(all_results)}")
         return jsonify({'success':True,'total':len(all_results),'results':all_results})
@@ -492,7 +498,6 @@ def scan_confirm():
     for o in orders:
         awb = o.get('awb','').strip()
         oid = o.get('order_id','').strip()
-        # Skip if AWB or Order ID already exists
         if not awb or awb in existing or (oid and oid in existing_oids):
             skipped += 1
             continue
@@ -526,13 +531,9 @@ def scan_return():
     condition = request.form.get('condition','Good')
     remark = request.form.get('remark','')
     photos = request.files.getlist('photos')
-
     if not awb:
         return jsonify({'error':'AWB required'}), 400
-
     conn = get_db()
-
-    # 1. DUPLICATE CHECK
     already = conn.execute(
         "SELECT id, condition FROM returns WHERE awb=? ORDER BY id DESC LIMIT 1", (awb,)
     ).fetchone()
@@ -544,12 +545,9 @@ def scan_return():
             'prev_id': already['id'],
             'prev_condition': already['condition']
         }), 409
-
-    # 2. ORDER LOOKUP + QTY CHECK
     order = conn.execute(
         "SELECT id, qty, sku, customer, amount, status FROM orders WHERE awb=?", (awb,)
     ).fetchone()
-
     qty_val = 1
     qty_alert = False
     if order:
@@ -559,18 +557,12 @@ def scan_return():
             qty_val = 1
         if qty_val > 1:
             qty_alert = True
-
-    # 3. SAVE PHOTOS
     photo_paths = []
     for photo in photos:
         if photo and photo.filename:
-            fn = secure_filename(
-                f"ret_{awb}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}"
-            )
+            fn = secure_filename(f"ret_{awb}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{photo.filename}")
             photo.save(os.path.join(IMAGES_FOLDER, fn))
             photo_paths.append(f"/static/images/{fn}")
-
-    # 4. UPDATE ORDER STATUS
     updated = False
     if order:
         conn.execute(
@@ -579,26 +571,28 @@ def scan_return():
             (f"{condition}|{remark}", ','.join(photo_paths), awb)
         )
         updated = True
-
-    # 5. INSERT INTO RETURNS
     conn.execute(
         "INSERT INTO returns (awb, condition, remark, photos, scanned_by) VALUES (?,?,?,?,?)",
         (awb, condition, remark, json.dumps(photo_paths), session.get('name',''))
     )
     conn.commit()
     conn.close()
-
     log_action(session.get('user','?'), 'RETURN_SCAN', f"AWB:{awb} {condition} QTY:{qty_val}")
-
+    order_dict = None
+    if order:
+        order_dict = dict(order)
+        if order_dict.get('customer'):
+            order_dict['customer'] = clean_customer_name(order_dict['customer'])
     return jsonify({
         'success': True,
         'updated': updated,
         'photos': photo_paths,
         'qty_alert': qty_alert,
         'qty': qty_val,
-        'order': dict(order) if order else None,
+        'order': order_dict,
         'message': f'Return saved! AWB: {awb}'
     })
+
 # ============ RETURNS API ============
 @app.route('/api/returns')
 @login_required
@@ -609,7 +603,13 @@ def get_returns():
                            FROM returns r LEFT JOIN orders o ON r.awb=o.awb
                            ORDER BY r.created_at DESC LIMIT 500''').fetchall()
     conn.close()
-    return jsonify({'returns':[dict(r) for r in rows]})
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get('customer'):
+            d['customer'] = clean_customer_name(d['customer'])
+        result.append(d)
+    return jsonify({'returns':result})
 
 # ============ CLAIMS API ============
 @app.route('/api/claims')
@@ -642,6 +642,7 @@ def get_products():
     rows = conn.execute("SELECT * FROM products ORDER BY sku LIMIT 5000").fetchall()
     conn.close()
     return jsonify({'products':[dict(r) for r in rows]})
+
 # ============ FRAUD ============
 @app.route('/api/fraud')
 @admin_required
